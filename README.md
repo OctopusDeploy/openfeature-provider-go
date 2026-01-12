@@ -1,5 +1,9 @@
 # Octopus Deploy OpenFeature Provider for Go
 
+[![Build and Test](https://github.com/OctopusDeploy/openfeature-provider-go/actions/workflows/ci.yml/badge.svg)](https://github.com/OctopusDeploy/openfeature-provider-go/actions/workflows/ci.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/OctopusDeploy/openfeature-provider-go)](https://goreportcard.com/report/github.com/OctopusDeploy/openfeature-provider-go)
+[![Go Reference](https://pkg.go.dev/badge/github.com/OctopusDeploy/openfeature-provider-go.svg)](https://pkg.go.dev/github.com/OctopusDeploy/openfeature-provider-go)
+
 The Octopus Deploy [OpenFeature provider](https://openfeature.dev/docs/reference/concepts/provider/) for Go.
 
 ## About Octopus Deploy
@@ -106,3 +110,4 @@ Read more about targeting segments in the [Octopus Deploy Feature Toggles docume
 ## Documentation
 
 For more information, please refer to the [OpenFeature Documentation](https://docs.openfeature.dev/docs/reference/concepts/evaluation-api/) and the [Octopus Deploy Feature Toggles documentation](https://octopus.com/docs/feature-toggles).
+
