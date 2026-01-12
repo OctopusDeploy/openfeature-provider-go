@@ -1,38 +1,42 @@
+version: "2"
+run:
+  go: "1.22"
 linters:
   enable:
-    - errcheck       # Check for unchecked errors
-    - gosimple       # Simplify code
-    - govet          # Vet examines Go source code
-    - ineffassign    # Detect ineffectual assignments
-    - staticcheck    # Go static analysis
-    - unused         # Check for unused constants, variables, functions and types
-    - gofmt          # Check if code is formatted with gofmt
-    - revive         # Fast, configurable, extensible linter
-    - gosec          # Security problems
-
-linters-settings:
-  errcheck:
-    check-blank: true
-
-  govet:
-    check-shadowing: true
-
-  revive:
+    - gosec
+    - revive
+  settings:
+    errcheck:
+      check-blank: true
+    revive:
+      rules:
+        - name: exported
+          arguments:
+            - checkPrivateReceivers
+            - sayRepetitiveInsteadOfStutters
+          disabled: false
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
     rules:
-      - name: exported
-        disabled: false
-        arguments:
-          - "checkPrivateReceivers"
-          - "sayRepetitiveInsteadOfStutters"
-
-run:
-  timeout: 5m
-  go: '1.22'
-
-issues:
-  exclude-rules:
-    # Exclude some linters from running on tests files
-    - path: _test\.go
-      linters:
-        - gosec
-        - errcheck
+      - linters:
+          - errcheck
+          - gosec
+        path: _test\.go
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
+formatters:
+  enable:
+    - gofmt
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
