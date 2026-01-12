@@ -45,7 +45,7 @@ func main() {
 	provider := octopus.NewOctopusProvider(config)
 
 	// Set the provider in OpenFeature
-	openfeature.SetProvider(provider)
+	openfeature.SetProviderAndWait(provider)
 
 	// Get a client
 	client := openfeature.NewClient("my-app")
