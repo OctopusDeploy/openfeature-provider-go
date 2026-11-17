@@ -26,6 +26,13 @@ module.exports = {
 
   packageRules: [
     {
+      // Keep the CI Go versions in one PR so lint and the latest test entry can't drift apart. The datasource
+      // leaves out go.mod's go line, which uses golang-version.
+      matchDepNames: ['go'],
+      matchDatasources: ['github-releases'],
+      groupName: 'CI Go version',
+    },
+    {
       // OpenFeature SDK updates are worth releasing as a minor version, even if not breaking
       matchPackageNames: ['github.com/open-feature/go-sdk'],
       matchUpdateTypes: ['minor', 'patch'],
