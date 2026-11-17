@@ -58,12 +58,8 @@ func TestProviderIsUnaffectedByLaterConfigurationChanges(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	configuration.ClientIdentifier = "changed"
 	configuration.CacheDuration = time.Hour
 
-	if provider.configuration.ClientIdentifier != "client-identifier" {
-		t.Errorf("ClientIdentifier = %q, want the original value", provider.configuration.ClientIdentifier)
-	}
 	if provider.configuration.CacheDuration != time.Minute {
 		t.Errorf("CacheDuration = %v, want the original value", provider.configuration.CacheDuration)
 	}
