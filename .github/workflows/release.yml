@@ -1,0 +1,51 @@
+name: Release build
+
+on:
+  push:
+    branches:
+      - main
+
+  workflow_dispatch:
+
+jobs:
+  release-please:
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5
+        id: release
+        with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+          target-branch: main
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+
+  # The tag is the release. Asking the module proxy for it caches the version,
+  # which is what index.golang.org and pkg.go.dev pick up.
+  warm-module-proxy:
+    needs: release-please
+    runs-on: ubuntu-latest
+    permissions: {}
+    if: ${{ fromJSON(needs.release-please.outputs.release_created || false) }}
+
+    steps:
+      - uses: actions/setup-go@v7
+        with:
+          go-version: "1.27"
+
+      - name: Fetch the release through proxy.golang.org
+        env:
+          TAG: ${{ needs.release-please.outputs.tag_name }}
+        run: |
+          for attempt in 1 2 3 4 5; do
+            go list -m "github.com/OctopusDeploy/openfeature-provider-go@${TAG}" && exit 0
+            sleep $((attempt * 10))
+          done
+          exit 1
