@@ -66,3 +66,19 @@ jobs:
       - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9.3.0
         with:
           version: v2.15.0
+
+  vulncheck:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          # Same as the latest test entry; Renovate bumps both together
+          go-version: "1.27"
+
+      # Fails only on vulnerable code the module actually reaches. Dependabot alerts cover the rest of the module
+      # graph. The daily schedule means a newly published vulnerability fails this build without a code change.
+      - name: Check for reachable vulnerabilities
+        run: go run golang.org/x/vuln/cmd/govulncheck@v1.9.0 ./...

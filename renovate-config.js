@@ -22,6 +22,14 @@ module.exports = {
       versioningTemplate: 'npm',
       extractVersionTemplate: '^(?<version>\\d+\\.\\d+\\.\\d+)(-\\d+)?$',
     },
+    {
+      // govulncheck runs through go run, which no built-in manager reads
+      customType: 'regex',
+      managerFilePatterns: ['/^\\.github/workflows/main\\.yml$/'],
+      matchStrings: ['golang\\.org/x/vuln/cmd/govulncheck@(?<currentValue>v[^\\s]+)'],
+      depNameTemplate: 'golang.org/x/vuln',
+      datasourceTemplate: 'go',
+    },
   ],
 
   packageRules: [
