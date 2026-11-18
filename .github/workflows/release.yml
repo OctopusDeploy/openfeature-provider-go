@@ -1,0 +1,59 @@
+name: Release build
+
+on:
+  push:
+    branches:
+      - main
+
+  workflow_dispatch:
+
+# Queue runs rather than cancelling, so a run that has already tagged a release still warms the proxy
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
+jobs:
+  release-please:
+    # A manual run from another branch would cut the release from that branch.
+    if: github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
+      issues: write
+      pull-requests: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5
+        id: release
+        with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN }}
+          target-branch: main
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json
+
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+
+  # The tag is the release. Fetching it through the module proxy caches it there,
+  # which is how index.golang.org and pkg.go.dev find out about it.
+  warm-module-proxy:
+    needs: release-please
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    if: ${{ fromJSON(needs.release-please.outputs.release_created || false) }}
+
+    steps:
+      # Read the module path from the tagged go.mod, so a /vN path change needs no edit here
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.release-please.outputs.tag_name }}
+
+      - name: Fetch the release through proxy.golang.org
+        env:
+          TAG: ${{ needs.release-please.outputs.tag_name }}
+        run: |
+          # The proxy escapes upper-case letters in module paths as !lower-case
+          module=$(awk '$1 == "module" {print $2}' go.mod | sed -E 's/[A-Z]/!\L&/g')
+          curl --fail-with-body --silent --show-error --retry 5 --retry-delay 10 --retry-all-errors \
+            "https://proxy.golang.org/${module}/@v/${TAG}.info"
