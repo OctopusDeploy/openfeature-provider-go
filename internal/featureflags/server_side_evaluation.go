@@ -40,9 +40,8 @@ func ParseEvaluations(body []byte) ([]ServerSideEvaluation, error) {
 	return evaluations, nil
 }
 
-// Evaluate resolves the flag, returning its value and reason. A flag in a
-// shape the server should never send returns a PARSE_ERROR
-// [openfeature.ResolutionError].
+// Evaluate resolves the flag, returning its value and reason. A malformed
+// flag returns a PARSE_ERROR [openfeature.ResolutionError].
 func (e ServerSideEvaluation) Evaluate(_ openfeature.FlattenedContext) (bool, string, error) {
 	if e.Value == nil {
 		return false, "", openfeature.NewParseErrorResolutionError("The flag has neither a value nor rules.")
