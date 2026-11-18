@@ -31,7 +31,8 @@ flowchart TD
 - While the major version is 0, a breaking change bumps the minor version (`bump-minor-pre-major`), so it can't promote the module to `v1` by accident.
 - **A pushed tag is permanent.** The module proxy caches every version it has served, so deleting or moving a tag doesn't take it back. Check the version in the release PR before merging. A bad version can only be [retracted](https://go.dev/ref/mod#go-mod-file-retract) in a later release.
 - **Promoting to `v1.0.0`** is a deliberate step, taken once the provider has been adopted. It needs no module-path change. Open a PR titled `chore: release 1.0.0` (an empty commit is enough), and when squash merging it, add `Release-As: 1.0.0` to the commit description. The repository squash merges with a blank description by default, so a footer on the branch's commits doesn't survive. Release Please then proposes `1.0.0` in the next release PR.
-- **From `v2` onwards** the module path must end in `/vN`. A major bump means editing the `module` line in `go.mod` and the module's own imports in the same release.
+- **From `v2` onwards** the module path must end in `/vN`. Move to a new major in one PR: the breaking change, plus the `module` line in `go.mod` and the module's own imports rewritten to `/vN`. The release PR then needs no manual edits.
+- **The `module-path` check** stops a release whose version doesn't match the module path. On the release PR, the version Release Please proposes must match the `/vN` suffix exactly, so a stray breaking-change marker can't tag a `v2.0.0` that no module path can import. On other PRs, the suffix may also be one major ahead of the last release, so a `/vN` change can land before its release. The failure message says how to fix each case.
 
 ## Cutting a release
 
