@@ -67,6 +67,24 @@ jobs:
         with:
           version: v2.15.0
 
+  module-path:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Test the module path check
+        run: .github/scripts/check-module-path.test.sh
+
+      # Release Please's PR holds the version it's about to tag, so it gets the strict check
+      - name: Check the module path matches the release version
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          mode=()
+          if [[ $HEAD_REF == release-please--branches--main ]]; then mode=(--release); fi
+          .github/scripts/check-module-path.sh "${mode[@]}" .release-please-manifest.json go.mod
+
   vulncheck:
     runs-on: ubuntu-latest
 
