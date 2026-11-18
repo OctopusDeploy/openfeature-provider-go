@@ -7,6 +7,11 @@ on:
 
   workflow_dispatch:
 
+# Queue runs rather than cancelling, so a run that has already tagged a release still warms the proxy
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
 jobs:
   release-please:
     # A manual run from another branch would cut the release from that branch.
