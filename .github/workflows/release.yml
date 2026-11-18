@@ -34,14 +34,21 @@ jobs:
   warm-module-proxy:
     needs: release-please
     runs-on: ubuntu-latest
-    permissions: {}
+    permissions:
+      contents: read
     if: ${{ fromJSON(needs.release-please.outputs.release_created || false) }}
 
     steps:
+      # Read the module path from the tagged go.mod, so a /vN path change needs no edit here
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.release-please.outputs.tag_name }}
+
       - name: Fetch the release through proxy.golang.org
         env:
           TAG: ${{ needs.release-please.outputs.tag_name }}
-        # The proxy escapes upper-case letters in module paths as !lower-case
-        run: >-
-          curl --fail --silent --show-error --retry 5 --retry-delay 10 --retry-all-errors
-          "https://proxy.golang.org/github.com/!octopus!deploy/openfeature-provider-go/@v/${TAG}.info"
+        run: |
+          # The proxy escapes upper-case letters in module paths as !lower-case
+          module=$(awk '$1 == "module" {print $2}' go.mod | sed -E 's/[A-Z]/!\L&/g')
+          curl --fail-with-body --silent --show-error --retry 5 --retry-delay 10 --retry-all-errors \
+            "https://proxy.golang.org/${module}/@v/${TAG}.info"
