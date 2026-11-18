@@ -41,13 +41,20 @@ func (e *FeatureFlagEvaluator) ContentHash() []byte {
 // FindEvaluationBySlug returns the first flag whose slug matches,
 // ignoring case.
 func (e *FeatureFlagEvaluator) FindEvaluationBySlug(slug string) (ServerSideEvaluation, bool) {
+	key := slugKey(slug)
 	for _, evaluation := range e.response.Evaluations {
-		if strings.EqualFold(evaluation.Slug, slug) {
+		if slugKey(evaluation.Slug) == key {
 			return evaluation, true
 		}
 	}
 
 	return ServerSideEvaluation{}, false
+}
+
+// slugKey is the one place slugs are made case-insensitive, so the lookup and
+// the warn-once tracking can't disagree about which slugs are the same.
+func slugKey(slug string) string {
+	return strings.ToLower(slug)
 }
 
 // Evaluate resolves the flag with the given slug. On any error it returns
@@ -56,7 +63,7 @@ func (e *FeatureFlagEvaluator) FindEvaluationBySlug(slug string) (ServerSideEval
 func (e *FeatureFlagEvaluator) Evaluate(slug string, defaultValue bool, flatCtx openfeature.FlattenedContext) openfeature.BoolResolutionDetail {
 	evaluation, found := e.FindEvaluationBySlug(slug)
 	if !found {
-		if _, warned := e.warnedSlugs.LoadOrStore(strings.ToLower(slug), struct{}{}); !warned {
+		if _, warned := e.warnedSlugs.LoadOrStore(slugKey(slug), struct{}{}); !warned {
 			e.logger.Warn("The slug did not match any of your Octopus Feature Flags. Please double check your slug and try again.", slog.String("slug", slug))
 		}
 
