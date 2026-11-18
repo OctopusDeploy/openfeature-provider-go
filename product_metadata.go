@@ -1,7 +1,7 @@
 package octopus
 
-// ProductMetadata describes the product using the provider. Octopus receives
-// it with each request, for telemetry.
+// ProductMetadata describes the product using the provider. The feature flags
+// service receives it with each request, for telemetry.
 type ProductMetadata struct {
 	name    string
 	version string
