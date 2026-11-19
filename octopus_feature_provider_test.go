@@ -114,6 +114,27 @@ func TestNewOctopusFeatureProviderRejectsInvalidConfiguration(t *testing.T) {
 	}
 }
 
+func TestNewOctopusFeatureProviderDefaultsServerUriForStructLiteralConfiguration(t *testing.T) {
+	metadata, err := NewProductMetadata("test-product")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	provider, err := NewOctopusFeatureProvider(&OctopusFeatureConfiguration{
+		ClientIdentifier: "client-identifier",
+		ProductMetadata:  metadata,
+		CacheDuration:    time.Minute,
+		RequestTimeout:   10 * time.Second,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if provider.configuration.serverUri != defaultServerUri {
+		t.Errorf("serverUri = %q, want %q", provider.configuration.serverUri, defaultServerUri)
+	}
+}
+
 func TestNewOctopusFeatureProviderAllowsRequestTimeoutLongerThanCacheDuration(t *testing.T) {
 	configuration := newTestConfiguration(t)
 	configuration.CacheDuration = time.Second

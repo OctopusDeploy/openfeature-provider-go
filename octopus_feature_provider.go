@@ -35,7 +35,13 @@ func NewOctopusFeatureProvider(configuration *OctopusFeatureConfiguration) (*Oct
 		return nil, err
 	}
 
-	return &OctopusFeatureProvider{configuration: *configuration}, nil
+	provider := &OctopusFeatureProvider{configuration: *configuration}
+	// A configuration built as a struct literal skips the constructor's default.
+	if provider.configuration.serverUri == "" {
+		provider.configuration.serverUri = defaultServerUri
+	}
+
+	return provider, nil
 }
 
 // Metadata implements [openfeature.FeatureProvider].
