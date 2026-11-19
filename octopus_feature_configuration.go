@@ -1,8 +1,11 @@
 package octopus
 
 import (
+	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -57,4 +60,24 @@ func NewOctopusFeatureConfiguration(clientIdentifier string, productMetadata Pro
 		RequestTimeout:   10 * time.Second,
 		serverUri:        defaultServerUri,
 	}
+}
+
+func (c *OctopusFeatureConfiguration) validate() error {
+	var errs []error
+
+	if strings.TrimSpace(c.ClientIdentifier) == "" {
+		errs = append(errs, errors.New("ClientIdentifier must not be empty"))
+	}
+	// The constructors guarantee a name, so an empty one means a zero value.
+	if c.ProductMetadata.Name() == "" {
+		errs = append(errs, errors.New("ProductMetadata must be created with NewProductMetadata or NewProductMetadataWithVersion"))
+	}
+	if c.CacheDuration <= 0 {
+		errs = append(errs, fmt.Errorf("CacheDuration must be positive, got %v", c.CacheDuration))
+	}
+	if c.RequestTimeout <= 0 {
+		errs = append(errs, fmt.Errorf("RequestTimeout must be positive, got %v", c.RequestTimeout))
+	}
+
+	return errors.Join(errs...)
 }

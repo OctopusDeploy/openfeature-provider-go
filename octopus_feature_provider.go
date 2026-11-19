@@ -22,14 +22,26 @@ type OctopusFeatureProvider struct {
 }
 
 // NewOctopusFeatureProvider returns a provider for the given configuration.
-// The provider keeps its own copy, so changes to configuration afterwards
-// have no effect on it. It makes no requests until the SDK initializes it.
+// It returns an error if ClientIdentifier is empty, ProductMetadata wasn't
+// created with one of its constructors, or CacheDuration or RequestTimeout
+// isn't positive. The provider keeps its own copy, so changes to
+// configuration afterwards have no effect on it. It makes no requests until
+// the SDK initializes it.
 func NewOctopusFeatureProvider(configuration *OctopusFeatureConfiguration) (*OctopusFeatureProvider, error) {
 	if configuration == nil {
 		return nil, errors.New("configuration must not be nil")
 	}
+	if err := configuration.validate(); err != nil {
+		return nil, err
+	}
 
-	return &OctopusFeatureProvider{configuration: *configuration}, nil
+	provider := &OctopusFeatureProvider{configuration: *configuration}
+	// A configuration built as a struct literal skips the constructor's default.
+	if provider.configuration.serverUri == "" {
+		provider.configuration.serverUri = defaultServerUri
+	}
+
+	return provider, nil
 }
 
 // Metadata implements [openfeature.FeatureProvider].
