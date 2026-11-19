@@ -14,15 +14,28 @@ const flagNotFoundMessage = "The slug provided did not match any of your Octopus
 // FeatureFlagEvaluator resolves flags from one evaluation response. It is
 // safe for concurrent use.
 type FeatureFlagEvaluator struct {
-	response    EvaluationResponse
-	logger      *slog.Logger
-	warnedSlugs sync.Map
+	evaluationsBySlug map[string]ServerSideEvaluation
+	contentHash       []byte
+	logger            *slog.Logger
+	warnedSlugs       sync.Map
 }
 
 // NewFeatureFlagEvaluator returns an evaluator for response. The logger must
 // not be nil.
 func NewFeatureFlagEvaluator(response EvaluationResponse, logger *slog.Logger) *FeatureFlagEvaluator {
-	return &FeatureFlagEvaluator{response: response, logger: logger}
+	evaluationsBySlug := make(map[string]ServerSideEvaluation, len(response.Evaluations))
+	for _, evaluation := range response.Evaluations {
+		key := slugKey(evaluation.Slug)
+		if _, exists := evaluationsBySlug[key]; !exists {
+			evaluationsBySlug[key] = evaluation
+		}
+	}
+
+	return &FeatureFlagEvaluator{
+		evaluationsBySlug: evaluationsBySlug,
+		contentHash:       response.ContentHash,
+		logger:            logger,
+	}
 }
 
 // EmptyFeatureFlagEvaluator returns an evaluator with no flags, for use
@@ -35,23 +48,17 @@ func EmptyFeatureFlagEvaluator(logger *slog.Logger) *FeatureFlagEvaluator {
 // ContentHash returns the content hash of the response the evaluator was
 // built from.
 func (e *FeatureFlagEvaluator) ContentHash() []byte {
-	return e.response.ContentHash
+	return e.contentHash
 }
 
 // FindEvaluationBySlug returns the first flag whose slug matches,
 // ignoring case.
 func (e *FeatureFlagEvaluator) FindEvaluationBySlug(slug string) (ServerSideEvaluation, bool) {
-	key := slugKey(slug)
-	for _, evaluation := range e.response.Evaluations {
-		if slugKey(evaluation.Slug) == key {
-			return evaluation, true
-		}
-	}
-
-	return ServerSideEvaluation{}, false
+	evaluation, found := e.evaluationsBySlug[slugKey(slug)]
+	return evaluation, found
 }
 
-// slugKey is the one place slugs are made case-insensitive, so the lookup and
+// slugKey is the one place slugs are made case-insensitive, so the index and
 // the warn-once tracking can't disagree about which slugs are the same.
 func slugKey(slug string) string {
 	return strings.ToLower(slug)
