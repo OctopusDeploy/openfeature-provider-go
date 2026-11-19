@@ -67,6 +67,25 @@ jobs:
         with:
           version: v2.15.0
 
+  # From v2 onwards the module path must end in /vN, and Release Please never edits go.mod. This
+  # stops a breaking-change commit from tagging a major that no module path can import.
+  module-path:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      # On Release Please's PR, the manifest holds the version it's about to tag, so the suffix must
+      # match it exactly. Elsewhere it holds the last release, and the suffix may be one major ahead
+      # so a /vN change can land before the release that tags it.
+      - name: Check the module path matches the release version
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          mode=()
+          if [[ $HEAD_REF == release-please--branches--main ]]; then mode=(--release); fi
+          .github/scripts/check-module-path.sh "${mode[@]}" .release-please-manifest.json go.mod
+
   vulncheck:
     runs-on: ubuntu-latest
 
