@@ -68,12 +68,8 @@ func slugKey(slug string) string {
 // defaultValue alongside the error. A missing slug logs a warning the first
 // time it is asked for, ignoring case.
 func (e *FeatureFlagEvaluator) Evaluate(slug string, defaultValue bool, flatCtx openfeature.FlattenedContext) openfeature.BoolResolutionDetail {
-	evaluation, found := e.FindEvaluationBySlug(slug)
+	evaluation, found := e.findEvaluationOrWarn(slug)
 	if !found {
-		if _, warned := e.warnedSlugs.LoadOrStore(slugKey(slug), struct{}{}); !warned {
-			e.logger.Warn("The slug did not match any of your Octopus Feature Flags. Please double check your slug and try again.", slog.String("slug", slug))
-		}
-
 		return failed(defaultValue, openfeature.NewFlagNotFoundResolutionError(flagNotFoundMessage))
 	}
 
@@ -91,6 +87,30 @@ func (e *FeatureFlagEvaluator) Evaluate(slug string, defaultValue bool, flatCtx 
 		Value:                    value,
 		ProviderResolutionDetail: openfeature.ProviderResolutionDetail{Reason: openfeature.Reason(reason)},
 	}
+}
+
+// RejectNonBooleanEvaluation resolves a request for a non-boolean flag value,
+// which Octopus doesn't support. It returns TYPE_MISMATCH for an existing
+// flag, and FLAG_NOT_FOUND for a missing one, warning as
+// [FeatureFlagEvaluator.Evaluate] does.
+func (e *FeatureFlagEvaluator) RejectNonBooleanEvaluation(slug string) openfeature.ProviderResolutionDetail {
+	err := openfeature.NewTypeMismatchResolutionError("Octopus only supports boolean flags.")
+	if _, found := e.findEvaluationOrWarn(slug); !found {
+		err = openfeature.NewFlagNotFoundResolutionError(flagNotFoundMessage)
+	}
+
+	return openfeature.ProviderResolutionDetail{ResolutionError: err, Reason: openfeature.ErrorReason}
+}
+
+func (e *FeatureFlagEvaluator) findEvaluationOrWarn(slug string) (ServerSideEvaluation, bool) {
+	evaluation, found := e.FindEvaluationBySlug(slug)
+	if !found {
+		if _, warned := e.warnedSlugs.LoadOrStore(slugKey(slug), struct{}{}); !warned {
+			e.logger.Warn("The slug did not match any of your Octopus Feature Flags. Please double check your slug and try again.", slog.String("slug", slug))
+		}
+	}
+
+	return evaluation, found
 }
 
 func failed(defaultValue bool, err openfeature.ResolutionError) openfeature.BoolResolutionDetail {
