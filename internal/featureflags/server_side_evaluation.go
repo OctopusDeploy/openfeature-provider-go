@@ -16,6 +16,9 @@ type ServerSideEvaluation struct {
 	Reason *string `json:"reason"`
 }
 
+// ErrNullEvaluations is returned by [ParseEvaluations] for a JSON null body.
+var ErrNullEvaluations = errors.New("the evaluations response was null")
+
 // ParseEvaluations decodes the body of a v4 evaluations response. Null
 // entries and entries without a slug are dropped, since no lookup can match
 // them. A wrong-typed field fails the whole response.
@@ -26,7 +29,7 @@ func ParseEvaluations(body []byte) ([]ServerSideEvaluation, error) {
 	}
 
 	if entries == nil {
-		return nil, errors.New("the evaluations response was null")
+		return nil, ErrNullEvaluations
 	}
 
 	evaluations := make([]ServerSideEvaluation, 0, len(entries))
