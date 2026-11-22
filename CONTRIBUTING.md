@@ -19,6 +19,16 @@ CI runs these on every PR, and fails the build if any of them fail. Run them loc
 
 CI runs the tests on both the oldest Go version `go.mod` allows and the latest release.
 
+## The public API
+
+[`testdata/api.txt`](testdata/api.txt) records every exported function, type, field and method, in the same format as the Go repository's `api/go1.txt`. The tests fail when the public API no longer matches it, so every API change shows up in the PR diff. If the change is intended, regenerate the file and commit it:
+
+```bash
+go test -run TestPublicApi -update .
+```
+
+The tests also fail when the public API exposes a type consumers can't import, such as a type under `internal/` or an unexported type. Types from the standard library and the OpenFeature SDK are fine. Export the type, or keep it out of the public API.
+
 ## Dependencies
 
 `go.mod` and `go.sum` are committed, and CI fails if they aren't tidy. After changing dependencies, run `go mod tidy` and commit the result.
