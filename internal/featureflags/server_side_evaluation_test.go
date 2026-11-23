@@ -34,6 +34,39 @@ func TestParseEvaluationsRejectsTheWholeBodyForAWrongTypedField(t *testing.T) {
 	}
 }
 
+func TestParseEvaluationsRejectsTheWholeBodyForAWrongTypedRuleField(t *testing.T) {
+	tests := []struct {
+		name  string
+		rules string
+	}{
+		{
+			name:  "rules is an object",
+			rules: `{"name": "Rule", "conditions": []}`,
+		},
+		{
+			name:  "percentage is a string",
+			rules: `[{"name": "Rule", "conditions": [{"type": "percentage-by-context", "percentage": "50"}]}]`,
+		},
+		{
+			name:  "key is a number",
+			rules: `[{"name": "Rule", "conditions": [{"type": "context-attribute-is-one-of", "key": 1, "values": ["a"]}]}]`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			body := `[
+				{"slug": "feature-a", "evaluationKey": "key", "rules": ` + tt.rules + `},
+				{"slug": "feature-b", "value": true, "reason": "Enabled."}
+			]`
+
+			if _, err := ParseEvaluations([]byte(body)); err == nil {
+				t.Error("expected an error for a wrong-typed field")
+			}
+		})
+	}
+}
+
 func TestParseEvaluationsAcceptsAnEmptyArray(t *testing.T) {
 	evaluations, err := ParseEvaluations([]byte(`[]`))
 	if err != nil {

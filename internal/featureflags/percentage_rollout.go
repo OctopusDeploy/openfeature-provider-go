@@ -2,8 +2,41 @@ package featureflags
 
 import (
 	"encoding/binary"
+	"fmt"
 	"math/bits"
+
+	"github.com/open-feature/go-sdk/openfeature"
 )
+
+// percentageByContextCondition matches when the targeting key falls within
+// the Percentage% rollout. Percentage is a pointer so a missing value can be
+// told apart from 0, which legitimately means nobody.
+type percentageByContextCondition struct {
+	Percentage *int32 `json:"percentage"`
+}
+
+func (c percentageByContextCondition) matches(ctx ruleContext) (bool, error) {
+	if c.Percentage == nil {
+		return false, parseError("A condition is missing a percentage value.")
+	}
+
+	percentage := *c.Percentage
+
+	// Rejected rather than clamped: reading 101 as everyone would turn a flag
+	// on off the back of a bad payload.
+	if percentage < 0 || percentage > 100 {
+		return false, parseError(fmt.Sprintf("A condition has a percentage of %d.", percentage))
+	}
+
+	// Nothing to bucket, so only a full rollout matches, as the server treats
+	// an untenanted caller.
+	targetingKey, _ := ctx.flatCtx[openfeature.TargetingKey].(string)
+	if targetingKey == "" {
+		return percentage >= 100, nil
+	}
+
+	return rolloutBucket(ctx.evaluationKey, targetingKey) <= percentage, nil
+}
 
 // rolloutBucket returns a bucket from 1 to 100 for a targeting key. Hashing
 // the flag's evaluation key in keeps a caller's bucket stable for one flag
