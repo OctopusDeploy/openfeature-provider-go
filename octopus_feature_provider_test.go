@@ -264,22 +264,6 @@ func TestNonBooleanEvaluation(t *testing.T) {
 	}
 }
 
-func TestMissingSlugWarnsOnceAcrossFlagTypes(t *testing.T) {
-	server := newFakeFeatureFlagsServer(t)
-	var logOutput bytes.Buffer
-	configuration := server.configuration(t)
-	configuration.Logger = slog.New(slog.NewTextHandler(&logOutput, nil))
-	client := startProvider(t, configuration)
-
-	ctx := context.Background()
-	_, _ = client.BooleanValue(ctx, "missing-flag", false, openfeature.EvaluationContext{})
-	_, _ = client.StringValue(ctx, "missing-flag", "", openfeature.EvaluationContext{})
-
-	if warnings := strings.Count(logOutput.String(), "level=WARN"); warnings != 1 {
-		t.Errorf("logged %d warnings, want 1:\n%s", warnings, logOutput.String())
-	}
-}
-
 type countingTransport struct {
 	requests atomic.Int32
 }

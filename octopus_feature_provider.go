@@ -11,7 +11,10 @@ import (
 	"github.com/open-feature/go-sdk/openfeature"
 )
 
-const providerName = "octopus-go-provider"
+const (
+	providerName        = "octopus-go-provider"
+	flagNotFoundMessage = "The slug provided did not match any of your Octopus Feature Flags. Please double check your slug and try again."
+)
 
 var (
 	_ openfeature.FeatureProvider          = (*OctopusFeatureProvider)(nil)
@@ -169,5 +172,10 @@ func (p *OctopusFeatureProvider) ObjectEvaluation(_ context.Context, flag string
 }
 
 func (p *OctopusFeatureProvider) rejectNonBooleanEvaluation(flag string) openfeature.ProviderResolutionDetail {
-	return p.evaluatorCache.GetEvaluator().RejectNonBooleanEvaluation(flag)
+	err := openfeature.NewTypeMismatchResolutionError("Octopus only supports boolean flags.")
+	if _, found := p.evaluatorCache.GetEvaluator().FindEvaluationBySlug(flag); !found {
+		err = openfeature.NewFlagNotFoundResolutionError(flagNotFoundMessage)
+	}
+
+	return openfeature.ProviderResolutionDetail{ResolutionError: err, Reason: openfeature.ErrorReason}
 }
