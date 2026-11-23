@@ -68,7 +68,9 @@ func NewOctopusFeatureProvider(configuration *OctopusFeatureConfiguration) (*Oct
 	apiClient := featureflags.NewFeatureFlagApiClient(featureflags.FeatureFlagApiClientOptions{
 		ServerUri:              provider.configuration.serverUri,
 		ClientIdentifier:       provider.configuration.ClientIdentifier,
-		OctopusClient:          octopusClientHeader(provider.configuration.ProductMetadata),
+		ProductName:            provider.configuration.ProductMetadata.Name(),
+		ProductVersion:         provider.configuration.ProductMetadata.Version(),
+		ProviderVersion:        version,
 		ReleaseVersionOverride: provider.configuration.ReleaseVersionOverride,
 		RequestTimeout:         provider.configuration.RequestTimeout,
 		HttpClient:             httpClient,
@@ -96,15 +98,6 @@ func newOwnedTransport() http.RoundTripper {
 		TLSHandshakeTimeout:   10 * time.Second,
 		ExpectContinueTimeout: time.Second,
 	}
-}
-
-func octopusClientHeader(productMetadata ProductMetadata) string {
-	product := productMetadata.Name()
-	if productMetadata.Version() != "" {
-		product += "/" + productMetadata.Version()
-	}
-
-	return product + " openfeature-provider-go/" + version
 }
 
 // Metadata implements [openfeature.FeatureProvider].

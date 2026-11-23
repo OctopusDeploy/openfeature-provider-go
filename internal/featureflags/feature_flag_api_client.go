@@ -16,7 +16,9 @@ import (
 type FeatureFlagApiClientOptions struct {
 	ServerUri              string
 	ClientIdentifier       string
-	OctopusClient          string // the X-Octopus-Client header value
+	ProductName            string
+	ProductVersion         string // sent only when not empty
+	ProviderVersion        string
 	ReleaseVersionOverride string // sent only when not empty
 	RequestTimeout         time.Duration
 	HttpClient             *http.Client
@@ -112,12 +114,21 @@ func (c *FeatureFlagApiClient) get(ctx context.Context, path string) (*http.Resp
 	}
 
 	request.Header.Set("Authorization", "Bearer "+c.options.ClientIdentifier)
-	request.Header.Set("X-Octopus-Client", c.options.OctopusClient)
+	request.Header.Set("X-Octopus-Client", c.octopusClientHeader())
 	if c.options.ReleaseVersionOverride != "" {
 		request.Header.Set("X-Release-Version", c.options.ReleaseVersionOverride)
 	}
 
 	return c.options.HttpClient.Do(request)
+}
+
+func (c *FeatureFlagApiClient) octopusClientHeader() string {
+	product := c.options.ProductName
+	if c.options.ProductVersion != "" {
+		product += "/" + c.options.ProductVersion
+	}
+
+	return product + " openfeature-provider-go/" + c.options.ProviderVersion
 }
 
 func rejected(message string, attrs ...slog.Attr) error {
