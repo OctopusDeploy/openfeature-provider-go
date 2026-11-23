@@ -38,7 +38,9 @@ type fakeFeatureFlagsServer struct {
 
 	mu          sync.Mutex
 	evaluations fakeResponse
+	check       *fakeResponse // nil serves the evaluations' content hash
 	requests    []recordedRequest
+	requested   chan struct{} // closed and replaced on every request
 }
 
 func newFakeFeatureFlagsServer(t *testing.T) *fakeFeatureFlagsServer {
@@ -46,6 +48,7 @@ func newFakeFeatureFlagsServer(t *testing.T) *fakeFeatureFlagsServer {
 
 	server := &fakeFeatureFlagsServer{
 		evaluations: fakeResponse{body: `[]`, contentHash: []byte("initial-hash")},
+		requested:   make(chan struct{}),
 	}
 	server.Server = httptest.NewServer(http.HandlerFunc(server.handle))
 	t.Cleanup(server.Close)
@@ -69,6 +72,61 @@ func (s *fakeFeatureFlagsServer) setEvaluations(response fakeResponse) {
 	s.evaluations = response
 }
 
+// setCheck overrides the check endpoint's response.
+func (s *fakeFeatureFlagsServer) setCheck(response fakeResponse) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.check = &response
+}
+
+// requestCount returns how many requests have been made to path.
+func (s *fakeFeatureFlagsServer) requestCount(path string) int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.requestCountLocked(path)
+}
+
+func (s *fakeFeatureFlagsServer) requestCountLocked(path string) int {
+	count := 0
+	for _, request := range s.requests {
+		if request.path == path {
+			count++
+		}
+	}
+	return count
+}
+
+// waitForRequests waits until at least n requests have been made to path.
+func (s *fakeFeatureFlagsServer) waitForRequests(t *testing.T, path string, n int) {
+	t.Helper()
+
+	timeout := time.After(5 * time.Second)
+	for {
+		s.mu.Lock()
+		count, requested := s.requestCountLocked(path), s.requested
+		s.mu.Unlock()
+
+		if count >= n {
+			return
+		}
+
+		select {
+		case <-requested:
+		case <-timeout:
+			t.Fatalf("got %d requests to %s, want at least %d", count, path, n)
+		}
+	}
+}
+
+// waitForCompletedChecks waits until n more checks have completed. The
+// provider checks one at a time, so a check has completed, and anything it
+// triggered has finished, once the next one starts.
+func (s *fakeFeatureFlagsServer) waitForCompletedChecks(t *testing.T, n int) {
+	t.Helper()
+
+	s.waitForRequests(t, checkPath, s.requestCount(checkPath)+n+1)
+}
+
 func (s *fakeFeatureFlagsServer) recordedRequests() []recordedRequest {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -78,14 +136,20 @@ func (s *fakeFeatureFlagsServer) recordedRequests() []recordedRequest {
 func (s *fakeFeatureFlagsServer) handle(w http.ResponseWriter, r *http.Request) {
 	s.mu.Lock()
 	s.requests = append(s.requests, recordedRequest{method: r.Method, path: r.URL.Path, header: r.Header.Clone()})
+	close(s.requested)
+	s.requested = make(chan struct{})
 
 	var response fakeResponse
 	switch r.URL.Path {
 	case evaluationsPath:
 		response = s.evaluations
 	case checkPath:
-		body, _ := json.Marshal(map[string][]byte{"contentHash": s.evaluations.contentHash})
-		response = fakeResponse{body: string(body)}
+		if s.check != nil {
+			response = *s.check
+		} else {
+			body, _ := json.Marshal(map[string][]byte{"contentHash": s.evaluations.contentHash})
+			response = fakeResponse{body: string(body)}
+		}
 	default:
 		response = fakeResponse{status: http.StatusNotFound}
 	}

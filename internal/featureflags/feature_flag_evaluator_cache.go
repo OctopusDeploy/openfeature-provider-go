@@ -4,22 +4,30 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"sync"
 	"sync/atomic"
+	"time"
 )
 
 // FeatureFlagEvaluatorCache holds the evaluator the provider evaluates
-// against. It starts with the empty evaluator, so evaluations return
-// FLAG_NOT_FOUND until a manifest has been fetched.
+// against, and keeps it current by polling for changes. It starts with the
+// empty evaluator, so evaluations return FLAG_NOT_FOUND until a manifest has
+// been fetched.
 type FeatureFlagEvaluatorCache struct {
-	client    *FeatureFlagApiClient
-	logger    *slog.Logger
-	evaluator atomic.Pointer[FeatureFlagEvaluator]
+	client        *FeatureFlagApiClient
+	cacheDuration time.Duration
+	logger        *slog.Logger
+	evaluator     atomic.Pointer[FeatureFlagEvaluator]
+
+	mu   sync.Mutex
+	stop context.CancelFunc // nil when not running
+	done chan struct{}      // closed once the poller has exited
 }
 
-// NewFeatureFlagEvaluatorCache returns a cache that fetches with client. The
-// logger must not be nil.
-func NewFeatureFlagEvaluatorCache(client *FeatureFlagApiClient, logger *slog.Logger) *FeatureFlagEvaluatorCache {
-	cache := &FeatureFlagEvaluatorCache{client: client, logger: logger}
+// NewFeatureFlagEvaluatorCache returns a cache that fetches with client and
+// checks for changes every cacheDuration. The logger must not be nil.
+func NewFeatureFlagEvaluatorCache(client *FeatureFlagApiClient, cacheDuration time.Duration, logger *slog.Logger) *FeatureFlagEvaluatorCache {
+	cache := &FeatureFlagEvaluatorCache{client: client, cacheDuration: cacheDuration, logger: logger}
 	cache.evaluator.Store(EmptyFeatureFlagEvaluator(logger))
 
 	return cache
@@ -30,9 +38,59 @@ func (c *FeatureFlagEvaluatorCache) GetEvaluator() *FeatureFlagEvaluator {
 	return c.evaluator.Load()
 }
 
-// Initialize fetches the manifest once. A failed fetch is logged, and the
-// cache keeps serving the empty evaluator.
-func (c *FeatureFlagEvaluatorCache) Initialize(ctx context.Context) {
+// Start fetches the manifest once, then polls for changes until Shutdown,
+// whether or not that fetch succeeded. A failed fetch is logged, and the
+// cache keeps serving the evaluator it has. Start does nothing if the cache
+// is already running.
+func (c *FeatureFlagEvaluatorCache) Start(ctx context.Context) {
+	c.mu.Lock()
+	if c.stop != nil {
+		c.mu.Unlock()
+		return
+	}
+	runCtx, stop := context.WithCancel(context.Background())
+	done := make(chan struct{})
+	c.stop, c.done = stop, done
+	c.mu.Unlock()
+
+	// The SDK can shut a provider down while it's still initializing, when
+	// it's replaced, so shutdown cancels this fetch as well.
+	fetchCtx, cancelFetch := context.WithCancel(ctx)
+	stopCancelling := context.AfterFunc(runCtx, cancelFetch)
+	c.initialize(fetchCtx)
+	stopCancelling()
+	cancelFetch()
+
+	go func() {
+		defer close(done)
+		c.poll(runCtx)
+	}()
+}
+
+// Shutdown stops polling and cancels any request in flight, even if ctx is
+// already done. It then waits for the poller to exit, returning ctx's error
+// if ctx ends first. Calling it again, or before Start, does nothing. The
+// cache keeps serving its last evaluator, and can be started again.
+func (c *FeatureFlagEvaluatorCache) Shutdown(ctx context.Context) error {
+	c.mu.Lock()
+	stop, done := c.stop, c.done
+	c.stop, c.done = nil, nil
+	c.mu.Unlock()
+
+	if stop == nil {
+		return nil
+	}
+	stop()
+
+	select {
+	case <-done:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+func (c *FeatureFlagEvaluatorCache) initialize(ctx context.Context) {
 	response, err := c.client.GetServerSideEvaluations(ctx)
 	if err != nil {
 		var rejected *RejectedResponseError
@@ -46,4 +104,54 @@ func (c *FeatureFlagEvaluatorCache) Initialize(ctx context.Context) {
 	}
 
 	c.evaluator.Store(NewFeatureFlagEvaluator(response, c.logger))
+}
+
+func (c *FeatureFlagEvaluatorCache) poll(ctx context.Context) {
+	// A timer reset after each refresh, rather than a ticker, so a slow
+	// refresh can't be followed immediately by another.
+	timer := time.NewTimer(c.cacheDuration)
+	defer timer.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-timer.C:
+		}
+
+		c.refresh(ctx)
+		timer.Reset(c.cacheDuration)
+	}
+}
+
+func (c *FeatureFlagEvaluatorCache) refresh(ctx context.Context) {
+	err := c.fetchIfChanged(ctx)
+	// A cancelled ctx is shutdown. A request that hit RequestTimeout fails
+	// with its own deadline and is reported.
+	if err == nil || ctx.Err() != nil {
+		return
+	}
+
+	attrs := []slog.Attr{slog.Any("error", err)}
+	var rejected *RejectedResponseError
+	if errors.As(err, &rejected) {
+		attrs = append(attrs, rejected.Attrs...)
+	}
+	c.logger.LogAttrs(ctx, slog.LevelError, "Failed to retrieve updated feature manifest. Retaining the existing evaluations, which may be stale.", attrs...)
+}
+
+func (c *FeatureFlagEvaluatorCache) fetchIfChanged(ctx context.Context) error {
+	changed, err := c.client.HaveFeaturesChanged(ctx, c.GetEvaluator().ContentHash())
+	if err != nil || !changed {
+		return err
+	}
+
+	response, err := c.client.GetServerSideEvaluations(ctx)
+	if err != nil {
+		return err
+	}
+
+	c.evaluator.Store(NewFeatureFlagEvaluator(response, c.logger))
+
+	return nil
 }
