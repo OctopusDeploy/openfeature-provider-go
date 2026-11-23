@@ -5,7 +5,6 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
-	"time"
 
 	"github.com/OctopusDeploy/openfeature-provider-go/internal/featureflags"
 	"github.com/open-feature/go-sdk/openfeature"
@@ -28,8 +27,9 @@ type OctopusFeatureProvider struct {
 	configuration  OctopusFeatureConfiguration
 	evaluatorCache *featureflags.FeatureFlagEvaluatorCache
 
-	// Nil when the caller supplied HttpClient and therefore keeps ownership
-	// of it.
+	// Nil when the provider doesn't own the client's transport: the caller
+	// supplied HttpClient, or the application has wrapped
+	// http.DefaultTransport.
 	ownedHttpClient *http.Client
 }
 
@@ -61,8 +61,11 @@ func NewOctopusFeatureProvider(configuration *OctopusFeatureConfiguration) (*Oct
 
 	httpClient := provider.configuration.HttpClient
 	if httpClient == nil {
-		httpClient = &http.Client{Transport: newOwnedTransport()}
-		provider.ownedHttpClient = httpClient
+		var owned bool
+		httpClient, owned = newDefaultHttpClient(http.DefaultTransport)
+		if owned {
+			provider.ownedHttpClient = httpClient
+		}
 	}
 
 	apiClient := featureflags.NewFeatureFlagApiClient(featureflags.FeatureFlagApiClientOptions{
@@ -80,24 +83,17 @@ func NewOctopusFeatureProvider(configuration *OctopusFeatureConfiguration) (*Oct
 	return provider, nil
 }
 
-// newOwnedTransport clones the default transport so closing idle connections
-// on shutdown can't affect anything else in the process that shares
-// http.DefaultTransport.
-func newOwnedTransport() http.RoundTripper {
-	if transport, ok := http.DefaultTransport.(*http.Transport); ok {
-		return transport.Clone()
+// newDefaultHttpClient returns the client used when none is configured. A
+// plain transport is cloned, so closing its idle connections on shutdown
+// can't affect anything else that shares it. A wrapped one, for example for
+// tracing, is used as-is so requests still go through the wrapper, and isn't
+// owned.
+func newDefaultHttpClient(base http.RoundTripper) (client *http.Client, owned bool) {
+	if transport, ok := base.(*http.Transport); ok {
+		return &http.Client{Transport: transport.Clone()}, true
 	}
 
-	// The application has wrapped the default transport, for example for
-	// tracing, so start from net/http's defaults instead.
-	return &http.Transport{
-		Proxy:                 http.ProxyFromEnvironment,
-		ForceAttemptHTTP2:     true,
-		MaxIdleConns:          100,
-		IdleConnTimeout:       90 * time.Second,
-		TLSHandshakeTimeout:   10 * time.Second,
-		ExpectContinueTimeout: time.Second,
-	}
+	return &http.Client{Transport: base}, false
 }
 
 // Metadata implements [openfeature.FeatureProvider].

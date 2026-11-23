@@ -292,17 +292,29 @@ func TestInjectedHttpClientIsUsed(t *testing.T) {
 
 type wrappedTransport struct{ http.RoundTripper }
 
-func TestNewOctopusFeatureProviderToleratesAWrappedDefaultTransport(t *testing.T) {
-	original := http.DefaultTransport
-	http.DefaultTransport = wrappedTransport{original}
-	t.Cleanup(func() { http.DefaultTransport = original })
+func TestNewDefaultHttpClientClonesAPlainTransport(t *testing.T) {
+	base := &http.Transport{}
 
-	server := newFakeFeatureFlagsServer(t)
-	server.setEvaluations(fakeResponse{body: testManifest, contentHash: []byte("hash")})
-	client := startProvider(t, server.configuration(t))
+	client, owned := newDefaultHttpClient(base)
 
-	if value, _ := client.BooleanValue(context.Background(), "enabled-flag", false, openfeature.EvaluationContext{}); !value {
-		t.Error("Value = false, want true")
+	if !owned {
+		t.Error("owned = false, want true")
+	}
+	if transport, ok := client.Transport.(*http.Transport); !ok || transport == base {
+		t.Errorf("Transport = %v, want a clone of the base transport", client.Transport)
+	}
+}
+
+func TestNewDefaultHttpClientUsesAWrappedTransportAsIs(t *testing.T) {
+	base := wrappedTransport{&http.Transport{}}
+
+	client, owned := newDefaultHttpClient(base)
+
+	if owned {
+		t.Error("owned = true, want false")
+	}
+	if client.Transport != base {
+		t.Errorf("Transport = %v, want the wrapped transport", client.Transport)
 	}
 }
 
