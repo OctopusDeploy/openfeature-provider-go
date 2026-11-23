@@ -58,11 +58,7 @@ func (c *FeatureFlagApiClient) GetServerSideEvaluations(ctx context.Context) (Ev
 	if err != nil {
 		return EvaluationResponse{}, err
 	}
-	defer func() {
-		// Drain what's left so the connection can be reused.
-		_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 4<<10))
-		_ = response.Body.Close()
-	}()
+	defer closeResponse(response)
 
 	serverUri := slog.String("serverUri", c.options.ServerUri)
 
@@ -129,6 +125,13 @@ func (c *FeatureFlagApiClient) octopusClientHeader() string {
 	}
 
 	return product + " openfeature-provider-go/" + c.options.ProviderVersion
+}
+
+// closeResponse drains what's left of the body so the connection can be
+// reused.
+func closeResponse(response *http.Response) {
+	_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 4<<10))
+	_ = response.Body.Close()
 }
 
 func rejected(message string, attrs ...slog.Attr) error {
