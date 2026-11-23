@@ -32,7 +32,7 @@ type ClientSideRule struct {
 // doesn't match, so a malformed condition after it is never reached.
 func (r ClientSideRule) matches(ctx ruleContext) (bool, error) {
 	// The server only defers a named rule with at least one condition, so
-	// anything else is a response it could not have sent.
+	// anything else means the response is malformed.
 	if r.Name == nil {
 		return false, parseError("A rule has no name.")
 	}

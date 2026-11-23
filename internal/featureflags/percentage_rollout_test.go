@@ -4,9 +4,9 @@ import "testing"
 
 func TestRolloutBucketMatchesTheSharedVectors(t *testing.T) {
 	// These cases verify that rolloutBucket produces the same bucketing values as the equivalent
-	// implementations in other Octopus OpenFeature provider libraries (e.g. .NET and Java). The expected
+	// implementations in other Octopus OpenFeature provider libraries. The expected
 	// values are derived from the reference MurmurHash3 little-endian algorithm and are duplicated verbatim
-	// across all libraries. DO NOT modify the input arguments or expected values — doing so would mask
+	// across all libraries. DO NOT modify the input arguments or expected values. Doing so would mask
 	// a real divergence in evaluation behaviour between libraries and defeat the purpose of this test.
 	vectors := []struct {
 		evaluationKey string

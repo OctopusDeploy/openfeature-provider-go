@@ -11,8 +11,9 @@ const (
 )
 
 type conditionMatcher interface {
-	// matches reports whether the condition is met. A condition that arrived
-	// in a shape its type can't evaluate returns a PARSE_ERROR.
+	// matches reports whether the condition is met. A condition missing a
+	// field its type needs, or with an out-of-range value, returns a
+	// PARSE_ERROR.
 	matches(ctx ruleContext) (bool, error)
 }
 
@@ -27,7 +28,7 @@ func (c ClientSideCondition) matches(ctx ruleContext) (bool, error) {
 }
 
 // UnmarshalJSON reads type first and decodes only the fields that type
-// needs. An unrecognised type keeps none of its fields, so a condition
+// needs. An unrecognised type has none of its fields decoded, so a condition
 // introduced by a newer server can't fail an older client's response.
 func (c *ClientSideCondition) UnmarshalJSON(data []byte) error {
 	var fields map[string]json.RawMessage
@@ -35,8 +36,9 @@ func (c *ClientSideCondition) UnmarshalJSON(data []byte) error {
 		return err
 	}
 
-	// A non-string type is treated as absent. The lookup is case-sensitive,
-	// as it is in .NET.
+	// A non-string type is treated as absent. Unlike the other fields, the key
+	// is matched exactly, so every provider agrees on whether a condition has
+	// a type.
 	var conditionType *string
 	if rawType, found := fields["type"]; found {
 		if err := json.Unmarshal(rawType, &conditionType); err != nil {
@@ -71,15 +73,15 @@ func decodeCondition[T conditionMatcher](data []byte) (conditionMatcher, error) 
 }
 
 // unknownCondition is a condition whose type this provider doesn't
-// recognise. It never matches, so a newer server's capability is treated as
-// not met rather than failing the flag.
+// recognise. It never matches, so a rule using a condition type from a newer
+// server doesn't match and the flag still evaluates.
 type unknownCondition struct {
 	conditionType *string
 }
 
 func (c unknownCondition) matches(ruleContext) (bool, error) {
-	// No server version sends a condition without a type, so unlike an
-	// unrecognised type this is a response that could not have been sent.
+	// Every server version sends a type, so a missing one means the response
+	// is malformed, not just newer than this provider.
 	if c.conditionType == nil {
 		return false, parseError("A condition is missing a type.")
 	}
