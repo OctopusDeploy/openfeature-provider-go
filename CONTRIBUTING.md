@@ -12,7 +12,7 @@ CI runs these on every PR, and fails the build if any of them fail. Run them loc
 |---|---|---|
 | Build | `go build ./...` | |
 | Vet | `go vet ./...` | |
-| Tests | `go test ./...` | |
+| Tests (with the race detector) | `go test -race ./...` | |
 | Tidy modules | `go mod tidy -diff` | `go mod tidy` |
 | Linting and formatting (golangci-lint) | `golangci-lint run` | `golangci-lint fmt` for formatting |
 | Known vulnerabilities ([govulncheck](https://go.dev/doc/tutorial/govulncheck)) | `go run golang.org/x/vuln/cmd/govulncheck@latest ./...` | Maintainers handle these. See [MAINTAINING.md](MAINTAINING.md) |

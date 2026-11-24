@@ -3,14 +3,17 @@ package octopus
 import (
 	"bytes"
 	"context"
+	"errors"
 	"log/slog"
 	"net/http"
 	"slices"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/OctopusDeploy/openfeature-provider-go/internal/featureflags"
 	"github.com/open-feature/go-sdk/openfeature"
 	"github.com/open-feature/go-sdk/openfeature/isolated"
 )
@@ -408,5 +411,387 @@ func TestNewOctopusFeatureProviderAllowsRequestTimeoutLongerThanCacheDuration(t 
 
 	if _, err := NewOctopusFeatureProvider(configuration); err != nil {
 		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+const testCacheDuration = 10 * time.Millisecond
+
+// syncBuffer collects log output written by the polling goroutine while the
+// test reads it.
+type syncBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (b *syncBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.Write(p)
+}
+
+func (b *syncBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return b.buf.String()
+}
+
+// initProvider initializes a provider without the SDK, so tests can drive
+// its lifecycle directly.
+func initProvider(t *testing.T, configuration *OctopusFeatureConfiguration) *OctopusFeatureProvider {
+	t.Helper()
+
+	provider, err := NewOctopusFeatureProvider(configuration)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := provider.InitWithContext(context.Background(), openfeature.EvaluationContext{}); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = provider.ShutdownWithContext(context.Background()) })
+
+	return provider
+}
+
+func evaluate(provider *OctopusFeatureProvider, slug string) openfeature.BoolResolutionDetail {
+	return provider.BooleanEvaluation(context.Background(), slug, false, openfeature.FlattenedContext{})
+}
+
+func TestPollingServesAChangedManifest(t *testing.T) {
+	server := newFakeFeatureFlagsServer(t)
+	server.setEvaluations(fakeResponse{body: `[{"slug": "enabled-flag", "value": false}]`, contentHash: []byte("old")})
+	// Logger stays nil, so this also catches a nil logger reaching the
+	// replacement evaluator when it warns about the missing slug.
+	configuration := server.configuration(t)
+	configuration.CacheDuration = testCacheDuration
+	client := startProvider(t, configuration)
+	server.waitForRequests(t, checkPath, 1)
+
+	server.setEvaluations(fakeResponse{body: testManifest, contentHash: []byte("new")})
+	server.waitForRequests(t, evaluationsPath, 2)
+	server.waitForCompletedChecks(t, 0)
+
+	ctx := context.Background()
+	if value, _ := client.BooleanValue(ctx, "enabled-flag", false, openfeature.EvaluationContext{}); !value {
+		t.Error("Value = false, want the changed manifest's true")
+	}
+	details, _ := client.BooleanValueDetails(ctx, "missing-flag", false, openfeature.EvaluationContext{})
+	if details.ErrorCode != openfeature.FlagNotFoundCode {
+		t.Errorf("ErrorCode = %v, want %v", details.ErrorCode, openfeature.FlagNotFoundCode)
+	}
+}
+
+func TestPollingDoesNotRefetchAnUnchangedManifest(t *testing.T) {
+	server := newFakeFeatureFlagsServer(t)
+	configuration := server.configuration(t)
+	configuration.CacheDuration = testCacheDuration
+	startProvider(t, configuration)
+
+	server.waitForRequests(t, checkPath, 3)
+
+	if count := server.requestCount(evaluationsPath); count != 1 {
+		t.Errorf("got %d evaluations requests, want 1", count)
+	}
+}
+
+func TestPollingFetchesTheEvaluationsDirectlyWhenThereIsNoManifest(t *testing.T) {
+	server := newFakeFeatureFlagsServer(t)
+	server.setEvaluations(fakeResponse{status: http.StatusInternalServerError})
+	configuration := server.configuration(t)
+	configuration.CacheDuration = testCacheDuration
+	client := startProvider(t, configuration)
+	server.waitForRequests(t, evaluationsPath, 2)
+
+	server.setEvaluations(fakeResponse{body: testManifest, contentHash: []byte("hash")})
+	server.waitForRequests(t, checkPath, 1)
+
+	requests := server.recordedRequests()
+	for _, request := range requests[:slices.IndexFunc(requests, func(r recordedRequest) bool { return r.path == checkPath })] {
+		if request.path != evaluationsPath {
+			t.Errorf("request to %s before the first check, want only evaluations requests", request.path)
+		}
+	}
+	if value, _ := client.BooleanValue(context.Background(), "enabled-flag", false, openfeature.EvaluationContext{}); !value {
+		t.Error("Value = false, want true")
+	}
+}
+
+func TestRefreshFailureKeepsTheLastManifest(t *testing.T) {
+	tests := []struct {
+		name        string
+		breakServer func(*fakeFeatureFlagsServer)
+	}{
+		{"check server error", func(s *fakeFeatureFlagsServer) { s.setCheck(fakeResponse{status: http.StatusInternalServerError}) }},
+		{"malformed check body", func(s *fakeFeatureFlagsServer) { s.setCheck(fakeResponse{body: `{`}) }},
+		{"missing content hash in check", func(s *fakeFeatureFlagsServer) { s.setCheck(fakeResponse{body: `{}`}) }},
+		{"check timeout", func(s *fakeFeatureFlagsServer) { s.setCheck(fakeResponse{delay: time.Minute}) }},
+		{"evaluations server error after a change", func(s *fakeFeatureFlagsServer) {
+			s.setEvaluations(fakeResponse{status: http.StatusInternalServerError, contentHash: []byte("new")})
+		}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := newFakeFeatureFlagsServer(t)
+			server.setEvaluations(fakeResponse{body: testManifest, contentHash: []byte("old")})
+			var logOutput syncBuffer
+			configuration := server.configuration(t)
+			configuration.CacheDuration = testCacheDuration
+			configuration.RequestTimeout = 50 * time.Millisecond
+			configuration.Logger = slog.New(slog.NewTextHandler(&logOutput, nil))
+			client := startProvider(t, configuration)
+
+			tt.breakServer(server)
+			server.waitForCompletedChecks(t, 1)
+
+			if value, _ := client.BooleanValue(context.Background(), "enabled-flag", false, openfeature.EvaluationContext{}); !value {
+				t.Error("Value = false, want the last manifest's true")
+			}
+			logs := logOutput.String()
+			if !strings.Contains(logs, `level=ERROR msg="Failed to retrieve updated feature manifest. Retaining the existing evaluations, which may be stale."`) {
+				t.Errorf("logs do not contain the refresh failure:\n%s", logs)
+			}
+			if strings.Contains(logs, "level=WARN") {
+				t.Errorf("logs contain a warning, want only the error:\n%s", logs)
+			}
+		})
+	}
+}
+
+func TestShutdownStopsPolling(t *testing.T) {
+	cancelled, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	tests := []struct {
+		name string
+		ctx  context.Context
+	}{
+		{"live context", context.Background()},
+		// When replacing a provider, the SDK shuts it down with its original
+		// SetProvider ctx, and that ctx may have expired.
+		{"cancelled context", cancelled},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := newFakeFeatureFlagsServer(t)
+			configuration := server.configuration(t)
+			configuration.CacheDuration = testCacheDuration
+			provider := initProvider(t, configuration)
+			server.waitForRequests(t, checkPath, 1)
+
+			_ = provider.ShutdownWithContext(tt.ctx)
+			// Lets a poller that's still exiting finish before counting.
+			time.Sleep(5 * testCacheDuration)
+			count := len(server.recordedRequests())
+			time.Sleep(10 * testCacheDuration)
+
+			if got := len(server.recordedRequests()); got != count {
+				t.Errorf("got %d requests after shutdown, want none", got-count)
+			}
+		})
+	}
+}
+
+func TestShutdownCancelsAnInFlightRequest(t *testing.T) {
+	server := newFakeFeatureFlagsServer(t)
+	server.setCheck(fakeResponse{delay: time.Minute})
+	configuration := server.configuration(t)
+	configuration.CacheDuration = testCacheDuration
+	configuration.RequestTimeout = time.Minute
+	provider := initProvider(t, configuration)
+	server.waitForRequests(t, checkPath, 1)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := provider.ShutdownWithContext(ctx); err != nil {
+		t.Errorf("ShutdownWithContext returned %v, want nil", err)
+	}
+}
+
+func TestSharedProviderFetchesOnceAndShutsDownCleanly(t *testing.T) {
+	server := newFakeFeatureFlagsServer(t)
+	server.setEvaluations(fakeResponse{body: testManifest, contentHash: []byte("hash")})
+	provider, err := NewOctopusFeatureProvider(server.configuration(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// The SDK initializes and shuts down the provider once per binding.
+	ctx := context.Background()
+	api := isolated.NewAPI()
+	if err := api.SetProviderAndWait(ctx, provider); err != nil {
+		t.Fatal(err)
+	}
+	if err := api.SetProviderAndWait(ctx, provider, openfeature.WithDomain("other-domain")); err != nil {
+		t.Fatal(err)
+	}
+	if err := api.Shutdown(ctx); err != nil {
+		t.Errorf("Shutdown returned %v, want nil", err)
+	}
+
+	if count := server.requestCount(evaluationsPath); count != 1 {
+		t.Errorf("got %d evaluations requests, want 1", count)
+	}
+	if !evaluate(provider, "enabled-flag").Value {
+		t.Error("Value = false after shutdown, want the last manifest's true")
+	}
+}
+
+func TestInitAfterShutdownReturnsAnError(t *testing.T) {
+	server := newFakeFeatureFlagsServer(t)
+	provider := initProvider(t, server.configuration(t))
+	if err := provider.ShutdownWithContext(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+
+	err := provider.InitWithContext(context.Background(), openfeature.EvaluationContext{})
+
+	if !errors.Is(err, featureflags.ErrShutDown) {
+		t.Errorf("InitWithContext returned %v, want %v", err, featureflags.ErrShutDown)
+	}
+}
+
+func TestInitAfterAnEarlierShutdownStartsNothing(t *testing.T) {
+	server := newFakeFeatureFlagsServer(t)
+	configuration := server.configuration(t)
+	configuration.CacheDuration = testCacheDuration
+	provider, err := NewOctopusFeatureProvider(configuration)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// When the SDK replaces a provider, its shutdown and its pending init
+	// run in separate goroutines, so shutdown can arrive first.
+	if err := provider.ShutdownWithContext(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	if err := provider.InitWithContext(context.Background(), openfeature.EvaluationContext{}); err == nil {
+		t.Error("InitWithContext returned nil, want an error")
+	}
+
+	// A started provider fetches before Init returns, so no requests means
+	// nothing started.
+	if requests := server.recordedRequests(); len(requests) != 0 {
+		t.Errorf("got %d requests, want none: %+v", len(requests), requests)
+	}
+}
+
+func TestPollingOutlivesTheInitContext(t *testing.T) {
+	server := newFakeFeatureFlagsServer(t)
+	configuration := server.configuration(t)
+	configuration.CacheDuration = testCacheDuration
+	provider, err := NewOctopusFeatureProvider(configuration)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = provider.ShutdownWithContext(context.Background()) })
+
+	ctx, cancel := context.WithCancel(context.Background())
+	if err := provider.InitWithContext(ctx, openfeature.EvaluationContext{}); err != nil {
+		t.Fatal(err)
+	}
+	cancel()
+
+	server.waitForRequests(t, checkPath, 2)
+}
+
+func TestShutdownCancelsAnInitFetchQuietly(t *testing.T) {
+	server := newFakeFeatureFlagsServer(t)
+	server.setEvaluations(fakeResponse{body: testManifest, contentHash: []byte("hash"), delay: time.Minute})
+	var logOutput syncBuffer
+	configuration := server.configuration(t)
+	configuration.RequestTimeout = time.Minute
+	configuration.Logger = slog.New(slog.NewTextHandler(&logOutput, nil))
+	provider, err := NewOctopusFeatureProvider(configuration)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	initialized := make(chan error, 1)
+	go func() { initialized <- provider.InitWithContext(context.Background(), openfeature.EvaluationContext{}) }()
+	server.waitForRequests(t, evaluationsPath, 1)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := provider.ShutdownWithContext(ctx); err != nil {
+		t.Errorf("ShutdownWithContext returned %v, want nil", err)
+	}
+	if err := <-initialized; err != nil {
+		t.Errorf("InitWithContext returned %v, want nil", err)
+	}
+
+	if logs := logOutput.String(); strings.Contains(logs, "level=ERROR") {
+		t.Errorf("logs contain an error:\n%s", logs)
+	}
+}
+
+func TestSecondInitWaitsForTheFirstFetch(t *testing.T) {
+	server := newFakeFeatureFlagsServer(t)
+	server.setEvaluations(fakeResponse{body: testManifest, contentHash: []byte("hash"), delay: 100 * time.Millisecond})
+	provider, err := NewOctopusFeatureProvider(server.configuration(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = provider.ShutdownWithContext(context.Background()) })
+
+	go func() { _ = provider.InitWithContext(context.Background(), openfeature.EvaluationContext{}) }()
+	server.waitForRequests(t, evaluationsPath, 1)
+	if err := provider.InitWithContext(context.Background(), openfeature.EvaluationContext{}); err != nil {
+		t.Fatal(err)
+	}
+
+	if !evaluate(provider, "enabled-flag").Value {
+		t.Error("Value = false after the second init, want the first fetch's true")
+	}
+}
+
+type closeTrackingTransport struct {
+	http.RoundTripper
+	closed atomic.Bool
+}
+
+func (c *closeTrackingTransport) CloseIdleConnections() {
+	c.closed.Store(true)
+}
+
+func TestShutdownLeavesAnInjectedHttpClientOpen(t *testing.T) {
+	server := newFakeFeatureFlagsServer(t)
+	transport := &closeTrackingTransport{RoundTripper: http.DefaultTransport}
+	configuration := server.configuration(t)
+	configuration.HttpClient = &http.Client{Transport: transport}
+	provider := initProvider(t, configuration)
+
+	if err := provider.ShutdownWithContext(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+
+	if transport.closed.Load() {
+		t.Error("shutdown closed the injected client's idle connections")
+	}
+}
+
+func TestShutdownClosesAnOwnedHttpClient(t *testing.T) {
+	server := newFakeFeatureFlagsServer(t)
+	provider, err := NewOctopusFeatureProvider(server.configuration(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if provider.ownedHttpClient == nil {
+		t.Fatal("ownedHttpClient = nil, want the provider's own client")
+	}
+	// The API client shares this *http.Client, so its requests go through the
+	// tracking transport too.
+	transport := &closeTrackingTransport{RoundTripper: provider.ownedHttpClient.Transport}
+	provider.ownedHttpClient.Transport = transport
+	if err := provider.InitWithContext(context.Background(), openfeature.EvaluationContext{}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := provider.ShutdownWithContext(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+
+	if !transport.closed.Load() {
+		t.Error("shutdown didn't close the owned client's idle connections")
 	}
 }

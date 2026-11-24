@@ -78,7 +78,7 @@ func NewOctopusFeatureProvider(configuration *OctopusFeatureConfiguration) (*Oct
 		RequestTimeout:         provider.configuration.RequestTimeout,
 		HttpClient:             httpClient,
 	})
-	provider.evaluatorCache = featureflags.NewFeatureFlagEvaluatorCache(apiClient, logger)
+	provider.evaluatorCache = featureflags.NewFeatureFlagEvaluatorCache(apiClient, provider.configuration.CacheDuration, logger)
 
 	return provider, nil
 }
@@ -112,13 +112,15 @@ func (p *OctopusFeatureProvider) Init(evaluationContext openfeature.EvaluationCo
 }
 
 // InitWithContext implements [openfeature.ContextAwareStateHandler]. It
-// fetches the feature flags once, stopping early if ctx is done. It never
-// returns an error: if the fetch fails, the provider is still ready, and
-// every evaluation returns the default with FLAG_NOT_FOUND.
+// fetches the feature flags, stopping early if ctx is done, and then checks
+// for changes every CacheDuration until shutdown. A failed fetch isn't an
+// error: the provider is still ready, and every evaluation returns the
+// default with FLAG_NOT_FOUND until a later check succeeds. Calling it again
+// while the provider is running waits for the first fetch and starts nothing
+// new. After shutdown it returns an error, because a provider can't be
+// initialized again.
 func (p *OctopusFeatureProvider) InitWithContext(ctx context.Context, _ openfeature.EvaluationContext) error {
-	p.evaluatorCache.Initialize(ctx)
-
-	return nil
+	return p.evaluatorCache.Start(ctx)
 }
 
 // Shutdown implements [openfeature.StateHandler].
@@ -126,9 +128,20 @@ func (p *OctopusFeatureProvider) Shutdown() {
 	_ = p.ShutdownWithContext(context.Background())
 }
 
-// ShutdownWithContext implements [openfeature.ContextAwareStateHandler].
-func (p *OctopusFeatureProvider) ShutdownWithContext(_ context.Context) error {
-	return nil
+// ShutdownWithContext implements [openfeature.ContextAwareStateHandler]. It
+// stops checking for changes and cancels any request in flight, even if ctx
+// is already done, then waits for that to finish, returning ctx's error if
+// ctx ends first. Evaluations keep using the last feature flags fetched. It
+// can be called more than once, and the provider can't be initialized again
+// afterwards.
+func (p *OctopusFeatureProvider) ShutdownWithContext(ctx context.Context) error {
+	err := p.evaluatorCache.Shutdown(ctx)
+
+	if p.ownedHttpClient != nil {
+		p.ownedHttpClient.CloseIdleConnections()
+	}
+
+	return err
 }
 
 // BooleanEvaluation implements [openfeature.FeatureProvider].

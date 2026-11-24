@@ -1,8 +1,10 @@
 package featureflags
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -37,8 +39,8 @@ func NewFeatureFlagApiClient(options FeatureFlagApiClientOptions) *FeatureFlagAp
 }
 
 // RejectedResponseError is returned when the service responds, but not with
-// a usable manifest. The cache logs it as a warning; other failures are
-// errors.
+// a usable manifest. The cache logs it as a warning during init, and as an
+// error when a refresh fails. Other failures are always errors.
 type RejectedResponseError struct {
 	Message string
 	Attrs   []slog.Attr
@@ -46,6 +48,41 @@ type RejectedResponseError struct {
 
 func (e *RejectedResponseError) Error() string {
 	return e.Message
+}
+
+// HaveFeaturesChanged reports whether the service's evaluations no longer
+// match contentHash. An empty contentHash means nothing has been fetched
+// yet, so it reports a change without asking. The request is bounded by
+// RequestTimeout as well as ctx.
+func (c *FeatureFlagApiClient) HaveFeaturesChanged(ctx context.Context, contentHash []byte) (bool, error) {
+	if len(contentHash) == 0 {
+		return true, nil
+	}
+
+	ctx, cancel := context.WithTimeout(ctx, c.options.RequestTimeout)
+	defer cancel()
+
+	response, err := c.get(ctx, "api/feature-flags/check/v4/")
+	if err != nil {
+		return false, err
+	}
+	defer closeResponse(response)
+
+	if response.StatusCode < 200 || response.StatusCode > 299 {
+		return false, rejected("Feature flag check returned an unsuccessful status code", slog.String("serverUri", c.options.ServerUri), slog.Int("status", response.StatusCode))
+	}
+
+	var check struct {
+		ContentHash []byte `json:"contentHash"`
+	}
+	if err := json.NewDecoder(response.Body).Decode(&check); err != nil {
+		return false, fmt.Errorf("decoding the check response: %w", err)
+	}
+	if check.ContentHash == nil {
+		return false, rejected("Failed to retrieve feature flags for client identifier. Check did not return a valid content hash.", slog.String("serverUri", c.options.ServerUri))
+	}
+
+	return !bytes.Equal(check.ContentHash, contentHash), nil
 }
 
 // GetServerSideEvaluations fetches the current v4 evaluations. Each request
@@ -58,11 +95,7 @@ func (c *FeatureFlagApiClient) GetServerSideEvaluations(ctx context.Context) (Ev
 	if err != nil {
 		return EvaluationResponse{}, err
 	}
-	defer func() {
-		// Drain what's left so the connection can be reused.
-		_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 4<<10))
-		_ = response.Body.Close()
-	}()
+	defer closeResponse(response)
 
 	serverUri := slog.String("serverUri", c.options.ServerUri)
 
@@ -129,6 +162,13 @@ func (c *FeatureFlagApiClient) octopusClientHeader() string {
 	}
 
 	return product + " openfeature-provider-go/" + c.options.ProviderVersion
+}
+
+// closeResponse drains what's left of the body so the connection can be
+// reused.
+func closeResponse(response *http.Response) {
+	_, _ = io.Copy(io.Discard, io.LimitReader(response.Body, 4<<10))
+	_ = response.Body.Close()
 }
 
 func rejected(message string, attrs ...slog.Attr) error {
