@@ -35,6 +35,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@v7
+        with:
+          # The tests read the fixtures from the specification submodule
+          submodules: true
 
       - uses: actions/setup-go@v7
         with:
