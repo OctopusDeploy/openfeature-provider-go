@@ -769,3 +769,29 @@ func TestShutdownLeavesAnInjectedHttpClientOpen(t *testing.T) {
 		t.Error("shutdown closed the injected client's idle connections")
 	}
 }
+
+func TestShutdownClosesAnOwnedHttpClient(t *testing.T) {
+	server := newFakeFeatureFlagsServer(t)
+	provider, err := NewOctopusFeatureProvider(server.configuration(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if provider.ownedHttpClient == nil {
+		t.Fatal("ownedHttpClient = nil, want the provider's own client")
+	}
+	// The API client shares this *http.Client, so its requests go through the
+	// tracking transport too.
+	transport := &closeTrackingTransport{RoundTripper: provider.ownedHttpClient.Transport}
+	provider.ownedHttpClient.Transport = transport
+	if err := provider.InitWithContext(context.Background(), openfeature.EvaluationContext{}); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := provider.ShutdownWithContext(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+
+	if !transport.closed.Load() {
+		t.Error("shutdown didn't close the owned client's idle connections")
+	}
+}
