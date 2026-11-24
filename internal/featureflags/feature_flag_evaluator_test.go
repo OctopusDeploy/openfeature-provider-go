@@ -111,6 +111,123 @@ func TestEvaluate(t *testing.T) {
 	}
 }
 
+// The shared specification fixtures cover client-side rules. These are the
+// cases they can't express: wrong-typed fields, the case of the type key and
+// non-string context values.
+func TestEvaluateClientSideRulesBeyondTheFixtures(t *testing.T) {
+	const body = `[
+		{"slug": "unknown-type-with-wrong-typed-fields", "evaluationKey": "key", "rules": [
+			{"name": "Future", "conditions": [{"type": "some-future-condition", "key": 1, "values": {"a": true}, "percentage": "50"}]}
+		]},
+		{"slug": "non-string-type", "evaluationKey": "key", "rules": [
+			{"name": "Typed", "conditions": [{"type": 1}]}
+		]},
+		{"slug": "capitalised-type-key", "evaluationKey": "key", "rules": [
+			{"name": "Everyone", "conditions": [{"Type": "percentage-by-context", "percentage": 100}]}
+		]},
+		{"slug": "partial-rollout", "evaluationKey": "key", "rules": [
+			{"name": "Rollout", "conditions": [{"type": "percentage-by-context", "percentage": 99}]}
+		]},
+		{"slug": "region-is-one-of", "evaluationKey": "key", "rules": [
+			{"name": "Region", "conditions": [{"type": "context-attribute-is-one-of", "key": "region", "values": ["1", "true"]}]}
+		]},
+		{"slug": "region-is-not-one-of", "evaluationKey": "key", "rules": [
+			{"name": "Region", "conditions": [{"type": "context-attribute-is-not-one-of", "key": "region", "values": ["1", "true"]}]}
+		]}
+	]`
+
+	tests := []struct {
+		name          string
+		slug          string
+		context       openfeature.FlattenedContext
+		wantValue     bool
+		wantReason    openfeature.Reason
+		wantErrorCode openfeature.ErrorCode
+	}{
+		{
+			name:       "an unrecognised condition type ignores its wrong-typed fields and doesn't match",
+			slug:       "unknown-type-with-wrong-typed-fields",
+			wantReason: "Did not match any rules.",
+		},
+		{
+			name:          "a non-string condition type is a parse error",
+			slug:          "non-string-type",
+			wantReason:    openfeature.ErrorReason,
+			wantErrorCode: openfeature.ParseErrorCode,
+		},
+		{
+			name:          "the type key is case-sensitive, so a capitalised one is a missing type",
+			slug:          "capitalised-type-key",
+			wantReason:    openfeature.ErrorReason,
+			wantErrorCode: openfeature.ParseErrorCode,
+		},
+		{
+			name:       "a non-string targeting key is missing, so only a full rollout matches",
+			slug:       "partial-rollout",
+			context:    openfeature.FlattenedContext{openfeature.TargetingKey: 1},
+			wantReason: "Did not match any rules.",
+		},
+		{
+			name:       "an int attribute is absent to is-one-of",
+			slug:       "region-is-one-of",
+			context:    openfeature.FlattenedContext{"region": 1},
+			wantReason: "Did not match any rules.",
+		},
+		{
+			name:       "a bool attribute is absent to is-one-of",
+			slug:       "region-is-one-of",
+			context:    openfeature.FlattenedContext{"region": true},
+			wantReason: "Did not match any rules.",
+		},
+		{
+			name:       "a nil attribute is absent to is-one-of",
+			slug:       "region-is-one-of",
+			context:    openfeature.FlattenedContext{"region": nil},
+			wantReason: "Did not match any rules.",
+		},
+		{
+			name:       "an int attribute is absent to is-not-one-of",
+			slug:       "region-is-not-one-of",
+			context:    openfeature.FlattenedContext{"region": 1},
+			wantValue:  true,
+			wantReason: "Matched rule 'Region'.",
+		},
+		{
+			name:       "a bool attribute is absent to is-not-one-of",
+			slug:       "region-is-not-one-of",
+			context:    openfeature.FlattenedContext{"region": true},
+			wantValue:  true,
+			wantReason: "Matched rule 'Region'.",
+		},
+		{
+			name:       "a nil attribute is absent to is-not-one-of",
+			slug:       "region-is-not-one-of",
+			context:    openfeature.FlattenedContext{"region": nil},
+			wantValue:  true,
+			wantReason: "Matched rule 'Region'.",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			evaluator := newTestEvaluator(t, body, io.Discard)
+
+			result := evaluator.Evaluate(tt.slug, false, tt.context)
+			detail := result.ResolutionDetail()
+
+			if result.Value != tt.wantValue {
+				t.Errorf("Value = %v, want %v", result.Value, tt.wantValue)
+			}
+			if detail.Reason != tt.wantReason {
+				t.Errorf("Reason = %q, want %q", detail.Reason, tt.wantReason)
+			}
+			if detail.ErrorCode != tt.wantErrorCode {
+				t.Errorf("ErrorCode = %q, want %q", detail.ErrorCode, tt.wantErrorCode)
+			}
+		})
+	}
+}
+
 func TestEvaluateWarnsOncePerMissingSlugIgnoringCase(t *testing.T) {
 	var logOutput bytes.Buffer
 	evaluator := newTestEvaluator(t, `[]`, &logOutput)
