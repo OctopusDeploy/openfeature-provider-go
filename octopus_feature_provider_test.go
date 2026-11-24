@@ -566,8 +566,8 @@ func TestShutdownStopsPolling(t *testing.T) {
 		ctx  context.Context
 	}{
 		{"live context", context.Background()},
-		// The SDK passes the original SetProvider ctx when replacing a
-		// provider, which may have expired.
+		// When replacing a provider, the SDK shuts it down with its original
+		// SetProvider ctx, and that ctx may have expired.
 		{"cancelled context", cancelled},
 	}
 

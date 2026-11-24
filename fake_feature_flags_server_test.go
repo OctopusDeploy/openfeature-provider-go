@@ -119,8 +119,8 @@ func (s *fakeFeatureFlagsServer) waitForRequests(t *testing.T, path string, n in
 }
 
 // waitForCompletedChecks waits until n more checks have completed. The
-// provider checks one at a time, so a check has completed, and anything it
-// triggered has finished, once the next one starts.
+// provider checks one at a time, so once the next check starts, the previous
+// one and anything it triggered have finished.
 func (s *fakeFeatureFlagsServer) waitForCompletedChecks(t *testing.T, n int) {
 	t.Helper()
 

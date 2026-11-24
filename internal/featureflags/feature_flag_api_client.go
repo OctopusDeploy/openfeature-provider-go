@@ -50,10 +50,10 @@ func (e *RejectedResponseError) Error() string {
 	return e.Message
 }
 
-// HaveFeaturesChanged asks the service whether the evaluations differ from
-// the ones with contentHash. An empty contentHash means nothing has been
-// fetched yet, so it reports a change without asking. The request is bounded
-// by RequestTimeout as well as ctx.
+// HaveFeaturesChanged reports whether the service's evaluations no longer
+// match contentHash. An empty contentHash means nothing has been fetched
+// yet, so it reports a change without asking. The request is bounded by
+// RequestTimeout as well as ctx.
 func (c *FeatureFlagApiClient) HaveFeaturesChanged(ctx context.Context, contentHash []byte) (bool, error) {
 	if len(contentHash) == 0 {
 		return true, nil

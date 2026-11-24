@@ -112,13 +112,13 @@ func (p *OctopusFeatureProvider) Init(evaluationContext openfeature.EvaluationCo
 }
 
 // InitWithContext implements [openfeature.ContextAwareStateHandler]. It
-// fetches the feature flags once, stopping early if ctx is done, and then
-// checks for changes every CacheDuration until shutdown. A failed fetch
-// isn't an error: the provider is still ready, and every evaluation returns
-// the default with FLAG_NOT_FOUND until a later check succeeds. Calling it
-// again while the provider is running waits for the first fetch and starts
-// nothing new. A provider can't be initialized again after shutdown, so it
-// returns an error then.
+// fetches the feature flags, stopping early if ctx is done, and then checks
+// for changes every CacheDuration until shutdown. A failed fetch isn't an
+// error: the provider is still ready, and every evaluation returns the
+// default with FLAG_NOT_FOUND until a later check succeeds. Calling it again
+// while the provider is running waits for the first fetch and starts nothing
+// new. After shutdown it returns an error, because a provider can't be
+// initialized again.
 func (p *OctopusFeatureProvider) InitWithContext(ctx context.Context, _ openfeature.EvaluationContext) error {
 	return p.evaluatorCache.Start(ctx)
 }
@@ -130,9 +130,10 @@ func (p *OctopusFeatureProvider) Shutdown() {
 
 // ShutdownWithContext implements [openfeature.ContextAwareStateHandler]. It
 // stops checking for changes and cancels any request in flight, even if ctx
-// is already done, and uses ctx only to bound waiting for that to finish.
-// Evaluations keep using the last feature flags fetched. It can be called
-// more than once, and the provider can't be initialized again afterwards.
+// is already done, then waits for that to finish, returning ctx's error if
+// ctx ends first. Evaluations keep using the last feature flags fetched. It
+// can be called more than once, and the provider can't be initialized again
+// afterwards.
 func (p *OctopusFeatureProvider) ShutdownWithContext(ctx context.Context) error {
 	err := p.evaluatorCache.Shutdown(ctx)
 

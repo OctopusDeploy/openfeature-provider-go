@@ -19,8 +19,8 @@ type FeatureFlagEvaluatorCache struct {
 	logger        *slog.Logger
 	evaluator     atomic.Pointer[FeatureFlagEvaluator]
 
-	// The lifecycle runs one way: Start, then Shutdown. These are created
-	// once, so every caller waits on the same channels.
+	// Created once and never reset, so a Shutdown that races Start still
+	// cancels the run Start uses.
 	runCtx      context.Context
 	stop        context.CancelFunc
 	initialized chan struct{} // closed once the first fetch has finished
@@ -58,11 +58,11 @@ func (c *FeatureFlagEvaluatorCache) GetEvaluator() *FeatureFlagEvaluator {
 	return c.evaluator.Load()
 }
 
-// Start fetches the manifest once, then polls for changes until Shutdown,
-// whether or not that fetch succeeded. A failed fetch is logged, and the
-// cache keeps serving the evaluator it has. Calling it again while the cache
-// is running waits for the first fetch to finish, or for ctx to end, and
-// starts nothing new. After Shutdown it returns [ErrShutDown].
+// Start fetches the manifest and then polls for changes until Shutdown. A
+// failed fetch is logged and doesn't stop polling, and the cache keeps
+// serving the evaluator it has. A second call while the cache is running
+// starts nothing new: it waits for the first fetch to finish, or for ctx to
+// end. After Shutdown, Start returns [ErrShutDown].
 func (c *FeatureFlagEvaluatorCache) Start(ctx context.Context) error {
 	c.mu.Lock()
 	if c.closed {
@@ -80,8 +80,8 @@ func (c *FeatureFlagEvaluatorCache) Start(ctx context.Context) error {
 	c.started = true
 	c.mu.Unlock()
 
-	// The SDK can shut a provider down while it's still initializing, when
-	// it's replaced, so shutdown cancels this fetch as well.
+	// When the SDK replaces a provider, it can shut it down while it's still
+	// initializing, so shutdown cancels this fetch too.
 	fetchCtx, cancelFetch := context.WithCancel(ctx)
 	stopCancelling := context.AfterFunc(c.runCtx, cancelFetch)
 	c.initialize(fetchCtx)
@@ -98,10 +98,9 @@ func (c *FeatureFlagEvaluatorCache) Start(ctx context.Context) error {
 }
 
 // Shutdown stops polling and cancels any request in flight, even if ctx is
-// already done, and stops Start from running again. It then waits for the
-// poller to exit, returning ctx's error if ctx ends first. It can be called
-// any number of times, including before Start. The cache keeps serving its
-// last evaluator.
+// already done. It then waits for the poller to exit, returning ctx's error
+// if ctx ends first. It's safe to call more than once, even before Start.
+// The cache keeps serving its last evaluator, but can't be started again.
 func (c *FeatureFlagEvaluatorCache) Shutdown(ctx context.Context) error {
 	c.mu.Lock()
 	c.closed = true
@@ -113,8 +112,9 @@ func (c *FeatureFlagEvaluatorCache) Shutdown(ctx context.Context) error {
 		return nil
 	}
 
-	// Checked first so an already-cancelled ctx doesn't hide a poller that
-	// has already exited.
+	// select picks at random when both cases are ready, so done is checked
+	// on its own first. A poller that has exited returns nil even when ctx
+	// is already cancelled.
 	select {
 	case <-c.done:
 		return nil
@@ -170,8 +170,8 @@ func (c *FeatureFlagEvaluatorCache) poll(ctx context.Context) {
 
 func (c *FeatureFlagEvaluatorCache) refresh(ctx context.Context) {
 	err := c.fetchIfChanged(ctx)
-	// A cancelled ctx is shutdown. A request that hit RequestTimeout fails
-	// with its own deadline and is reported.
+	// Only shutdown cancels ctx. A request that hits RequestTimeout fails on
+	// its own deadline, so it's still reported.
 	if err == nil || ctx.Err() != nil {
 		return
 	}
