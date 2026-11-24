@@ -132,6 +132,11 @@ func (c *FeatureFlagEvaluatorCache) Shutdown(ctx context.Context) error {
 func (c *FeatureFlagEvaluatorCache) initialize(ctx context.Context) {
 	response, err := c.client.GetServerSideEvaluations(ctx)
 	if err != nil {
+		// Shutdown cancelled the fetch, so there's nothing to report.
+		if c.runCtx.Err() != nil {
+			return
+		}
+
 		var rejected *RejectedResponseError
 		if errors.As(err, &rejected) {
 			c.logger.LogAttrs(ctx, slog.LevelWarn, rejected.Message, rejected.Attrs...)

@@ -676,6 +676,36 @@ func TestInitAfterAnEarlierShutdownStartsNothing(t *testing.T) {
 	}
 }
 
+func TestShutdownCancelsAnInitFetchQuietly(t *testing.T) {
+	server := newFakeFeatureFlagsServer(t)
+	server.setEvaluations(fakeResponse{body: testManifest, contentHash: []byte("hash"), delay: time.Minute})
+	var logOutput syncBuffer
+	configuration := server.configuration(t)
+	configuration.RequestTimeout = time.Minute
+	configuration.Logger = slog.New(slog.NewTextHandler(&logOutput, nil))
+	provider, err := NewOctopusFeatureProvider(configuration)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	initialized := make(chan error, 1)
+	go func() { initialized <- provider.InitWithContext(context.Background(), openfeature.EvaluationContext{}) }()
+	server.waitForRequests(t, evaluationsPath, 1)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := provider.ShutdownWithContext(ctx); err != nil {
+		t.Errorf("ShutdownWithContext returned %v, want nil", err)
+	}
+	if err := <-initialized; err != nil {
+		t.Errorf("InitWithContext returned %v, want nil", err)
+	}
+
+	if logs := logOutput.String(); strings.Contains(logs, "level=ERROR") {
+		t.Errorf("logs contain an error:\n%s", logs)
+	}
+}
+
 func TestSecondInitWaitsForTheFirstFetch(t *testing.T) {
 	server := newFakeFeatureFlagsServer(t)
 	server.setEvaluations(fakeResponse{body: testManifest, contentHash: []byte("hash"), delay: 100 * time.Millisecond})
