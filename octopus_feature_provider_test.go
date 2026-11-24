@@ -676,6 +676,26 @@ func TestInitAfterAnEarlierShutdownStartsNothing(t *testing.T) {
 	}
 }
 
+func TestSecondInitWaitsForTheFirstFetch(t *testing.T) {
+	server := newFakeFeatureFlagsServer(t)
+	server.setEvaluations(fakeResponse{body: testManifest, contentHash: []byte("hash"), delay: 100 * time.Millisecond})
+	provider, err := NewOctopusFeatureProvider(server.configuration(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = provider.ShutdownWithContext(context.Background()) })
+
+	go func() { _ = provider.InitWithContext(context.Background(), openfeature.EvaluationContext{}) }()
+	server.waitForRequests(t, evaluationsPath, 1)
+	if err := provider.InitWithContext(context.Background(), openfeature.EvaluationContext{}); err != nil {
+		t.Fatal(err)
+	}
+
+	if !evaluate(provider, "enabled-flag").Value {
+		t.Error("Value = false after the second init, want the first fetch's true")
+	}
+}
+
 type closeTrackingTransport struct {
 	http.RoundTripper
 	closed atomic.Bool

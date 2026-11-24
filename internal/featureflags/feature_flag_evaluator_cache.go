@@ -21,9 +21,10 @@ type FeatureFlagEvaluatorCache struct {
 
 	// The lifecycle runs one way: Start, then Shutdown. These are created
 	// once, so every caller waits on the same channels.
-	runCtx context.Context
-	stop   context.CancelFunc
-	done   chan struct{} // closed once the poller has exited
+	runCtx      context.Context
+	stop        context.CancelFunc
+	initialized chan struct{} // closed once the first fetch has finished
+	done        chan struct{} // closed once the poller has exited
 
 	mu      sync.Mutex
 	started bool
@@ -44,6 +45,7 @@ func NewFeatureFlagEvaluatorCache(client *FeatureFlagApiClient, cacheDuration ti
 		logger:        logger,
 		runCtx:        runCtx,
 		stop:          stop,
+		initialized:   make(chan struct{}),
 		done:          make(chan struct{}),
 	}
 	cache.evaluator.Store(EmptyFeatureFlagEvaluator(logger))
@@ -59,7 +61,8 @@ func (c *FeatureFlagEvaluatorCache) GetEvaluator() *FeatureFlagEvaluator {
 // Start fetches the manifest once, then polls for changes until Shutdown,
 // whether or not that fetch succeeded. A failed fetch is logged, and the
 // cache keeps serving the evaluator it has. Calling it again while the cache
-// is running does nothing. After Shutdown it returns [ErrShutDown].
+// is running waits for the first fetch to finish, or for ctx to end, and
+// starts nothing new. After Shutdown it returns [ErrShutDown].
 func (c *FeatureFlagEvaluatorCache) Start(ctx context.Context) error {
 	c.mu.Lock()
 	if c.closed {
@@ -68,6 +71,10 @@ func (c *FeatureFlagEvaluatorCache) Start(ctx context.Context) error {
 	}
 	if c.started {
 		c.mu.Unlock()
+		select {
+		case <-c.initialized:
+		case <-ctx.Done():
+		}
 		return nil
 	}
 	c.started = true
@@ -80,6 +87,7 @@ func (c *FeatureFlagEvaluatorCache) Start(ctx context.Context) error {
 	c.initialize(fetchCtx)
 	stopCancelling()
 	cancelFetch()
+	close(c.initialized)
 
 	go func() {
 		defer close(c.done)

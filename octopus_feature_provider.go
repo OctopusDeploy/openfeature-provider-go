@@ -116,8 +116,9 @@ func (p *OctopusFeatureProvider) Init(evaluationContext openfeature.EvaluationCo
 // checks for changes every CacheDuration until shutdown. A failed fetch
 // isn't an error: the provider is still ready, and every evaluation returns
 // the default with FLAG_NOT_FOUND until a later check succeeds. Calling it
-// again while the provider is running does nothing. A provider can't be
-// initialized again after shutdown, so it returns an error then.
+// again while the provider is running waits for the first fetch and starts
+// nothing new. A provider can't be initialized again after shutdown, so it
+// returns an error then.
 func (p *OctopusFeatureProvider) InitWithContext(ctx context.Context, _ openfeature.EvaluationContext) error {
 	return p.evaluatorCache.Start(ctx)
 }
