@@ -19,15 +19,33 @@ type FeatureFlagEvaluatorCache struct {
 	logger        *slog.Logger
 	evaluator     atomic.Pointer[FeatureFlagEvaluator]
 
-	mu   sync.Mutex
-	stop context.CancelFunc // nil when not running
-	done chan struct{}      // closed once the poller has exited
+	// The lifecycle runs one way: Start, then Shutdown. These are created
+	// once, so every caller waits on the same channels.
+	runCtx context.Context
+	stop   context.CancelFunc
+	done   chan struct{} // closed once the poller has exited
+
+	mu      sync.Mutex
+	started bool
+	closed  bool
 }
+
+// ErrShutDown is returned by [FeatureFlagEvaluatorCache.Start] once the
+// cache has been shut down.
+var ErrShutDown = errors.New("the Octopus feature provider has been shut down and can't be initialized again; create a new provider instead")
 
 // NewFeatureFlagEvaluatorCache returns a cache that fetches with client and
 // checks for changes every cacheDuration. The logger must not be nil.
 func NewFeatureFlagEvaluatorCache(client *FeatureFlagApiClient, cacheDuration time.Duration, logger *slog.Logger) *FeatureFlagEvaluatorCache {
-	cache := &FeatureFlagEvaluatorCache{client: client, cacheDuration: cacheDuration, logger: logger}
+	runCtx, stop := context.WithCancel(context.Background())
+	cache := &FeatureFlagEvaluatorCache{
+		client:        client,
+		cacheDuration: cacheDuration,
+		logger:        logger,
+		runCtx:        runCtx,
+		stop:          stop,
+		done:          make(chan struct{}),
+	}
 	cache.evaluator.Store(EmptyFeatureFlagEvaluator(logger))
 
 	return cache
@@ -40,50 +58,63 @@ func (c *FeatureFlagEvaluatorCache) GetEvaluator() *FeatureFlagEvaluator {
 
 // Start fetches the manifest once, then polls for changes until Shutdown,
 // whether or not that fetch succeeded. A failed fetch is logged, and the
-// cache keeps serving the evaluator it has. Start does nothing if the cache
-// is already running.
-func (c *FeatureFlagEvaluatorCache) Start(ctx context.Context) {
+// cache keeps serving the evaluator it has. Calling it again while the cache
+// is running does nothing. After Shutdown it returns [ErrShutDown].
+func (c *FeatureFlagEvaluatorCache) Start(ctx context.Context) error {
 	c.mu.Lock()
-	if c.stop != nil {
+	if c.closed {
 		c.mu.Unlock()
-		return
+		return ErrShutDown
 	}
-	runCtx, stop := context.WithCancel(context.Background())
-	done := make(chan struct{})
-	c.stop, c.done = stop, done
+	if c.started {
+		c.mu.Unlock()
+		return nil
+	}
+	c.started = true
 	c.mu.Unlock()
 
 	// The SDK can shut a provider down while it's still initializing, when
 	// it's replaced, so shutdown cancels this fetch as well.
 	fetchCtx, cancelFetch := context.WithCancel(ctx)
-	stopCancelling := context.AfterFunc(runCtx, cancelFetch)
+	stopCancelling := context.AfterFunc(c.runCtx, cancelFetch)
 	c.initialize(fetchCtx)
 	stopCancelling()
 	cancelFetch()
 
 	go func() {
-		defer close(done)
-		c.poll(runCtx)
+		defer close(c.done)
+		c.poll(c.runCtx)
 	}()
+
+	return nil
 }
 
 // Shutdown stops polling and cancels any request in flight, even if ctx is
-// already done. It then waits for the poller to exit, returning ctx's error
-// if ctx ends first. Calling it again, or before Start, does nothing. The
-// cache keeps serving its last evaluator, and can be started again.
+// already done, and stops Start from running again. It then waits for the
+// poller to exit, returning ctx's error if ctx ends first. It can be called
+// any number of times, including before Start. The cache keeps serving its
+// last evaluator.
 func (c *FeatureFlagEvaluatorCache) Shutdown(ctx context.Context) error {
 	c.mu.Lock()
-	stop, done := c.stop, c.done
-	c.stop, c.done = nil, nil
+	c.closed = true
+	started := c.started
 	c.mu.Unlock()
 
-	if stop == nil {
+	c.stop()
+	if !started {
 		return nil
 	}
-	stop()
+
+	// Checked first so an already-cancelled ctx doesn't hide a poller that
+	// has already exited.
+	select {
+	case <-c.done:
+		return nil
+	default:
+	}
 
 	select {
-	case <-done:
+	case <-c.done:
 		return nil
 	case <-ctx.Done():
 		return ctx.Err()

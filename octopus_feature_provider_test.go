@@ -3,6 +3,7 @@ package octopus
 import (
 	"bytes"
 	"context"
+	"errors"
 	"log/slog"
 	"net/http"
 	"slices"
@@ -12,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/OctopusDeploy/openfeature-provider-go/internal/featureflags"
 	"github.com/open-feature/go-sdk/openfeature"
 	"github.com/open-feature/go-sdk/openfeature/isolated"
 )
@@ -635,24 +637,43 @@ func TestSharedProviderFetchesOnceAndShutsDownCleanly(t *testing.T) {
 	}
 }
 
-func TestProviderCanBeInitializedAgainAfterShutdown(t *testing.T) {
+func TestInitAfterShutdownReturnsAnError(t *testing.T) {
 	server := newFakeFeatureFlagsServer(t)
-	configuration := server.configuration(t)
-	configuration.CacheDuration = testCacheDuration
-	provider := initProvider(t, configuration)
+	provider := initProvider(t, server.configuration(t))
 	if err := provider.ShutdownWithContext(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 
-	server.setEvaluations(fakeResponse{body: testManifest, contentHash: []byte("hash")})
-	if err := provider.InitWithContext(context.Background(), openfeature.EvaluationContext{}); err != nil {
+	err := provider.InitWithContext(context.Background(), openfeature.EvaluationContext{})
+
+	if !errors.Is(err, featureflags.ErrShutDown) {
+		t.Errorf("InitWithContext returned %v, want %v", err, featureflags.ErrShutDown)
+	}
+}
+
+func TestInitAfterAnEarlierShutdownStartsNothing(t *testing.T) {
+	server := newFakeFeatureFlagsServer(t)
+	configuration := server.configuration(t)
+	configuration.CacheDuration = testCacheDuration
+	provider, err := NewOctopusFeatureProvider(configuration)
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	if !evaluate(provider, "enabled-flag").Value {
-		t.Error("Value = false, want true")
+	// When the SDK replaces a provider, its shutdown and its pending init
+	// run in separate goroutines, so shutdown can arrive first.
+	if err := provider.ShutdownWithContext(context.Background()); err != nil {
+		t.Fatal(err)
 	}
-	server.waitForRequests(t, checkPath, 1)
+	if err := provider.InitWithContext(context.Background(), openfeature.EvaluationContext{}); err == nil {
+		t.Error("InitWithContext returned nil, want an error")
+	}
+
+	// A started provider fetches before Init returns, so no requests means
+	// nothing started.
+	if requests := server.recordedRequests(); len(requests) != 0 {
+		t.Errorf("got %d requests, want none: %+v", len(requests), requests)
+	}
 }
 
 type closeTrackingTransport struct {
