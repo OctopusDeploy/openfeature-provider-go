@@ -1,5 +1,30 @@
 # Contributing
 
+## Changes to evaluation behaviour
+
+Octopus maintains OpenFeature providers for several languages, and they all need to evaluate flags the same way. The expected behaviour is defined in the shared [openfeature-provider-specification](https://github.com/OctopusDeploy/openfeature-provider-specification) repository, which is included here as a Git submodule in `specification/`. Every provider runs its fixtures as tests.
+
+If your change affects how flags are evaluated (conditions, rollouts, reasons, or how responses are parsed):
+
+1. Propose the change in the specification repository first.
+2. Once it's merged there, update the `specification` submodule in this repository and implement the change.
+
+Bug fixes that bring this provider in line with the existing specification don't need a specification change.
+
+## Getting the code
+
+The tests depend on the specification submodule, so clone with submodules:
+
+```bash
+git clone --recurse-submodules https://github.com/OctopusDeploy/openfeature-provider-go.git
+```
+
+If you've already cloned without submodules:
+
+```bash
+git submodule update --init
+```
+
 ## Setup
 
 You need Go 1.26 or later, the version in the `go` line of `go.mod`. Linting uses [golangci-lint](https://golangci-lint.run/) v2. CI uses the version pinned in `.github/workflows/main.yml`.
@@ -18,6 +43,8 @@ CI runs these on every PR, and fails the build if any of them fail. Run them loc
 | Known vulnerabilities ([govulncheck](https://go.dev/doc/tutorial/govulncheck)) | `go run golang.org/x/vuln/cmd/govulncheck@latest ./...` | Maintainers handle these. See [MAINTAINING.md](MAINTAINING.md) |
 
 CI runs the tests on both the oldest Go version `go.mod` allows and the latest release.
+
+The specification fixtures run as part of `TestSpecificationFixtures`.
 
 ## The public API
 
