@@ -6,8 +6,8 @@ import (
 	"github.com/open-feature/go-sdk/openfeature"
 )
 
-// These match the reasons the Feature Flags service gives server-side, so a
-// flag reads the same whichever side resolved it.
+// Both reasons match the ones the feature flags service gives server-side, so
+// a flag reads the same whichever side resolved it.
 const didNotMatchAnyRulesReason = "Did not match any rules."
 
 func matchedRuleReason(ruleName string) string {
