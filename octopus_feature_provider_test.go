@@ -676,6 +676,25 @@ func TestInitAfterAnEarlierShutdownStartsNothing(t *testing.T) {
 	}
 }
 
+func TestPollingOutlivesTheInitContext(t *testing.T) {
+	server := newFakeFeatureFlagsServer(t)
+	configuration := server.configuration(t)
+	configuration.CacheDuration = testCacheDuration
+	provider, err := NewOctopusFeatureProvider(configuration)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = provider.ShutdownWithContext(context.Background()) })
+
+	ctx, cancel := context.WithCancel(context.Background())
+	if err := provider.InitWithContext(ctx, openfeature.EvaluationContext{}); err != nil {
+		t.Fatal(err)
+	}
+	cancel()
+
+	server.waitForRequests(t, checkPath, 2)
+}
+
 func TestShutdownCancelsAnInitFetchQuietly(t *testing.T) {
 	server := newFakeFeatureFlagsServer(t)
 	server.setEvaluations(fakeResponse{body: testManifest, contentHash: []byte("hash"), delay: time.Minute})
