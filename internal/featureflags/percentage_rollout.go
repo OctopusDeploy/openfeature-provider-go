@@ -13,7 +13,7 @@ type percentageByContextCondition struct {
 	Percentage *int32 `json:"percentage"`
 }
 
-func (c percentageByContextCondition) matches(ctx ruleContext) (bool, error) {
+func (c percentageByContextCondition) matches(ruleCtx ruleContext) (bool, error) {
 	if c.Percentage == nil {
 		return false, parseError("A condition is missing a percentage value.")
 	}
@@ -28,12 +28,12 @@ func (c percentageByContextCondition) matches(ctx ruleContext) (bool, error) {
 
 	// Without a targeting key there's nothing to bucket, so only a 100%
 	// rollout matches. The server does the same for a caller with no tenant.
-	targetingKey, _ := ctx.flatCtx[openfeature.TargetingKey].(string)
+	targetingKey, _ := ruleCtx.flatCtx[openfeature.TargetingKey].(string)
 	if targetingKey == "" {
 		return percentage >= 100, nil
 	}
 
-	return rolloutBucket(ctx.evaluationKey, targetingKey) <= percentage, nil
+	return rolloutBucket(ruleCtx.evaluationKey, targetingKey) <= percentage, nil
 }
 
 // rolloutBucket returns a bucket from 1 to 100 for a targeting key. Hashing

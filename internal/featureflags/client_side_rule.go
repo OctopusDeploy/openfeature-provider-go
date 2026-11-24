@@ -30,7 +30,7 @@ type ClientSideRule struct {
 
 // matches evaluates the conditions in order, stopping at the first that
 // doesn't match, so a malformed condition after it is never reached.
-func (r ClientSideRule) matches(ctx ruleContext) (bool, error) {
+func (r ClientSideRule) matches(ruleCtx ruleContext) (bool, error) {
 	// The server only defers a named rule with at least one condition, so
 	// anything else means the response is malformed.
 	if r.Name == nil {
@@ -46,7 +46,7 @@ func (r ClientSideRule) matches(ctx ruleContext) (bool, error) {
 			return false, parseError(fmt.Sprintf("Rule '%s' has a missing condition.", *r.Name))
 		}
 
-		matched, err := condition.matches(ctx)
+		matched, err := condition.matches(ruleCtx)
 		if err != nil || !matched {
 			return false, err
 		}

@@ -12,16 +12,16 @@ type contextAttributeIsOneOfCondition struct {
 	Values []*string `json:"values"`
 }
 
-func (c contextAttributeIsOneOfCondition) matches(ctx ruleContext) (bool, error) {
-	return isOneOf(ctx, c.Key, c.Values)
+func (c contextAttributeIsOneOfCondition) matches(ruleCtx ruleContext) (bool, error) {
+	return isOneOf(ruleCtx, c.Key, c.Values)
 }
 
 // contextAttributeIsNotOneOfCondition is the exact negation of
 // contextAttributeIsOneOfCondition, so a missing attribute matches.
 type contextAttributeIsNotOneOfCondition contextAttributeIsOneOfCondition
 
-func (c contextAttributeIsNotOneOfCondition) matches(ctx ruleContext) (bool, error) {
-	isOne, err := isOneOf(ctx, c.Key, c.Values)
+func (c contextAttributeIsNotOneOfCondition) matches(ruleCtx ruleContext) (bool, error) {
+	isOne, err := isOneOf(ruleCtx, c.Key, c.Values)
 	if err != nil {
 		return false, err
 	}
@@ -33,7 +33,7 @@ func (c contextAttributeIsNotOneOfCondition) matches(ctx ruleContext) (bool, err
 // of values. Keys and values compare ignoring case, and a non-string value
 // counts as absent. Every entry whose key matches is checked, since a context
 // can hold several casings of one key and map order is random.
-func isOneOf(ctx ruleContext, key *string, values []*string) (bool, error) {
+func isOneOf(ruleCtx ruleContext, key *string, values []*string) (bool, error) {
 	if key == nil {
 		return false, parseError("A condition is missing a key.")
 	}
@@ -46,7 +46,7 @@ func isOneOf(ctx ruleContext, key *string, values []*string) (bool, error) {
 		return false, parseError("A condition is missing a value.")
 	}
 
-	for attributeKey, attributeValue := range ctx.flatCtx {
+	for attributeKey, attributeValue := range ruleCtx.flatCtx {
 		attribute, isString := attributeValue.(string)
 		if !isString || !strings.EqualFold(attributeKey, *key) {
 			continue

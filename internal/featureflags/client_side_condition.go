@@ -14,7 +14,7 @@ type conditionMatcher interface {
 	// matches reports whether the condition is met. A condition missing a
 	// field its type needs, or with an out-of-range value, returns a
 	// PARSE_ERROR.
-	matches(ctx ruleContext) (bool, error)
+	matches(ruleCtx ruleContext) (bool, error)
 }
 
 // ClientSideCondition is one condition of a [ClientSideRule], decoded by its
@@ -23,8 +23,8 @@ type ClientSideCondition struct {
 	matcher conditionMatcher
 }
 
-func (c ClientSideCondition) matches(ctx ruleContext) (bool, error) {
-	return c.matcher.matches(ctx)
+func (c ClientSideCondition) matches(ruleCtx ruleContext) (bool, error) {
+	return c.matcher.matches(ruleCtx)
 }
 
 // UnmarshalJSON reads type first and decodes only the fields that type
