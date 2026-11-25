@@ -32,7 +32,8 @@ jobs:
 
       - uses: actions/setup-go@v7
         with:
-          go-version: stable
+          # Same as the latest test entry in main.yml; Renovate bumps them together
+          go-version: "1.27"
 
       # Pinned in its own module so it stays out of the provider's go.mod
       - name: Install apidiff
