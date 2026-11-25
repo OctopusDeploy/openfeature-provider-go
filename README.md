@@ -58,9 +58,7 @@ func main() {
 
 	client := openfeature.NewDefaultClient()
 
-	evaluationContext := openfeature.NewEvaluationContext("user-123", map[string]any{"region": "eu"})
-
-	enabled, _ := client.BooleanValue(context.Background(), "to-the-moon-feature", false, evaluationContext)
+	enabled, _ := client.BooleanValue(context.Background(), "to-the-moon-feature", false, openfeature.EvaluationContext{})
 	if enabled {
 		fmt.Println("🚀🚀🚀")
 	}
