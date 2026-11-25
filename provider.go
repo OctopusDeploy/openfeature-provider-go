@@ -27,7 +27,7 @@ type Provider struct {
 	evaluatorCache *featureflags.FeatureFlagEvaluatorCache
 
 	// Nil when the provider doesn't own the client's transport: the caller
-	// supplied HttpClient, or the application has wrapped
+	// supplied HTTPClient, or the application has wrapped
 	// http.DefaultTransport.
 	ownedHttpClient *http.Client
 }
@@ -49,8 +49,8 @@ func NewProvider(configuration *Config) (*Provider, error) {
 
 	provider := &Provider{configuration: *configuration}
 	// A configuration built as a struct literal skips the constructor's default.
-	if provider.configuration.serverUri == "" {
-		provider.configuration.serverUri = defaultServerUri
+	if provider.configuration.serverURI == "" {
+		provider.configuration.serverURI = defaultServerUri
 	}
 
 	logger := provider.configuration.Logger
@@ -59,7 +59,7 @@ func NewProvider(configuration *Config) (*Provider, error) {
 	}
 	logger = logger.With(slog.String("provider", providerName))
 
-	httpClient := provider.configuration.HttpClient
+	httpClient := provider.configuration.HTTPClient
 	if httpClient == nil {
 		var owned bool
 		httpClient, owned = newDefaultHttpClient(http.DefaultTransport)
@@ -69,7 +69,7 @@ func NewProvider(configuration *Config) (*Provider, error) {
 	}
 
 	apiClient := featureflags.NewFeatureFlagApiClient(featureflags.FeatureFlagApiClientOptions{
-		ServerUri:              provider.configuration.serverUri,
+		ServerUri:              provider.configuration.serverURI,
 		ClientIdentifier:       provider.configuration.ClientIdentifier,
 		ProductName:            provider.configuration.ProductMetadata.Name(),
 		ProductVersion:         provider.configuration.ProductMetadata.Version(),

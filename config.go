@@ -40,13 +40,13 @@ type Config struct {
 	// nothing.
 	Logger *slog.Logger
 
-	// HttpClient is used for requests to the feature flags service, for
+	// HTTPClient is used for requests to the feature flags service, for
 	// example to configure a proxy, TLS or instrumentation. Nil means the
 	// provider creates and owns its own client. The provider never closes a
 	// client set here.
-	HttpClient *http.Client
+	HTTPClient *http.Client
 
-	serverUri string
+	serverURI string
 }
 
 // NewConfig returns a configuration with the required values set and every
@@ -57,7 +57,7 @@ func NewConfig(clientIdentifier string, productMetadata ProductMetadata) *Config
 		ProductMetadata:  productMetadata,
 		CacheDuration:    time.Minute,
 		RequestTimeout:   10 * time.Second,
-		serverUri:        defaultServerUri,
+		serverURI:        defaultServerUri,
 	}
 }
 

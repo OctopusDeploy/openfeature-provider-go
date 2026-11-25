@@ -18,7 +18,7 @@ pkg octopus, method (ProductMetadata) Version() string
 pkg octopus, type Config struct
 pkg octopus, type Config struct, CacheDuration time.Duration
 pkg octopus, type Config struct, ClientIdentifier string
-pkg octopus, type Config struct, HttpClient *http.Client
+pkg octopus, type Config struct, HTTPClient *http.Client
 pkg octopus, type Config struct, Logger *slog.Logger
 pkg octopus, type Config struct, ProductMetadata ProductMetadata
 pkg octopus, type Config struct, ReleaseVersionOverride string

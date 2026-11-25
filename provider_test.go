@@ -276,12 +276,12 @@ func (c *countingTransport) RoundTrip(request *http.Request) (*http.Response, er
 	return http.DefaultTransport.RoundTrip(request)
 }
 
-func TestInjectedHttpClientIsUsed(t *testing.T) {
+func TestInjectedHTTPClientIsUsed(t *testing.T) {
 	server := newFakeFeatureFlagsServer(t)
 	server.setEvaluations(fakeResponse{body: testManifest, contentHash: []byte("hash")})
 	transport := &countingTransport{}
 	configuration := server.configuration(t)
-	configuration.HttpClient = &http.Client{Transport: transport}
+	configuration.HTTPClient = &http.Client{Transport: transport}
 
 	client := startProvider(t, configuration)
 
@@ -385,7 +385,7 @@ func TestNewProviderRejectsInvalidConfiguration(t *testing.T) {
 	}
 }
 
-func TestNewProviderDefaultsServerUriForStructLiteralConfiguration(t *testing.T) {
+func TestNewProviderDefaultsServerURIForStructLiteralConfiguration(t *testing.T) {
 	metadata, err := NewProductMetadata("test-product")
 	if err != nil {
 		t.Fatal(err)
@@ -401,8 +401,8 @@ func TestNewProviderDefaultsServerUriForStructLiteralConfiguration(t *testing.T)
 		t.Fatal(err)
 	}
 
-	if provider.configuration.serverUri != defaultServerUri {
-		t.Errorf("serverUri = %q, want %q", provider.configuration.serverUri, defaultServerUri)
+	if provider.configuration.serverURI != defaultServerUri {
+		t.Errorf("serverURI = %q, want %q", provider.configuration.serverURI, defaultServerUri)
 	}
 }
 
@@ -756,11 +756,11 @@ func (c *closeTrackingTransport) CloseIdleConnections() {
 	c.closed.Store(true)
 }
 
-func TestShutdownLeavesAnInjectedHttpClientOpen(t *testing.T) {
+func TestShutdownLeavesAnInjectedHTTPClientOpen(t *testing.T) {
 	server := newFakeFeatureFlagsServer(t)
 	transport := &closeTrackingTransport{RoundTripper: http.DefaultTransport}
 	configuration := server.configuration(t)
-	configuration.HttpClient = &http.Client{Transport: transport}
+	configuration.HTTPClient = &http.Client{Transport: transport}
 	provider := initProvider(t, configuration)
 
 	if err := provider.ShutdownWithContext(context.Background()); err != nil {
