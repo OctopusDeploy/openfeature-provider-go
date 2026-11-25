@@ -70,7 +70,7 @@ func main() {
 
 This example is compiled with the tests, in [`example_test.go`](example_test.go).
 
-Octopus feature flags are boolean, so evaluate them with `BooleanValue`. `StringValue`, `FloatValue`, `IntValue` and `ObjectValue` return your default value with a `TYPE_MISMATCH` error code.
+Octopus feature flags are boolean, so evaluate them with `BooleanValue`. `StringValue`, `FloatValue`, `IntValue` and `ObjectValue` return your default value with a `TYPE_MISMATCH` error code, or `FLAG_NOT_FOUND` if the flag doesn't exist.
 
 Targeting rules match against string attributes in the evaluation context, and percentage rollouts use its targeting key. Without a targeting key, a caller is only included in a rollout set to 100%.
 
