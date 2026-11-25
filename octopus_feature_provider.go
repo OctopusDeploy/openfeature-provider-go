@@ -34,11 +34,12 @@ type OctopusFeatureProvider struct {
 }
 
 // NewOctopusFeatureProvider returns a provider for the given configuration.
-// It returns an error if ClientIdentifier is empty, ProductMetadata wasn't
-// created with one of its constructors, or CacheDuration or RequestTimeout
-// isn't positive. The provider keeps its own copy, so changes to
-// configuration afterwards have no effect on it. It makes no requests until
-// the SDK initializes it.
+// It returns an error if ClientIdentifier is empty, ClientIdentifier or
+// ReleaseVersionOverride contains a line break or other control character,
+// ProductMetadata wasn't created with one of its constructors, or
+// CacheDuration or RequestTimeout isn't positive. The provider keeps its own
+// copy, so changes to configuration afterwards have no effect on it. It makes
+// no requests until the SDK initializes it.
 func NewOctopusFeatureProvider(configuration *OctopusFeatureConfiguration) (*OctopusFeatureProvider, error) {
 	if configuration == nil {
 		return nil, errors.New("configuration must not be nil")

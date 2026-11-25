@@ -85,11 +85,11 @@ For information on using the OpenFeature client, refer to the [OpenFeature Go SD
 
 | Option | Required | Description |
 | --- | --- | --- |
-| `ClientIdentifier` | Yes | The client identifier from the Octopus variable `Octopus.FeatureFlags.ClientIdentifier`. |
+| `ClientIdentifier` | Yes | The client identifier from the Octopus variable `Octopus.FeatureFlags.ClientIdentifier`. Must not contain line breaks or other control characters, so remove any trailing newline when you read it from a file. |
 | `ProductMetadata` | Yes | The name and, optionally, version of your application, sent to Octopus for telemetry. Create it with `NewProductMetadata` or `NewProductMetadataWithVersion`. |
 | `CacheDuration` | No | How long between checks for changed flags. Defaults to 1 minute. Must be greater than 0. |
 | `RequestTimeout` | No | How long a request to Octopus may take before it's abandoned. Defaults to 10 seconds. Must be greater than 0, and should be well under `CacheDuration`. |
-| `ReleaseVersionOverride` | No | Overrides the release version embedded in the client identifier. |
+| `ReleaseVersionOverride` | No | Overrides the release version embedded in the client identifier. Must not contain line breaks or other control characters. |
 | `Logger` | No | A `*slog.Logger` for the provider's own log messages. If it's nil, the provider logs nothing. |
 | `HttpClient` | No | The `*http.Client` for requests to Octopus. If it's nil, the provider creates its own. |
 
