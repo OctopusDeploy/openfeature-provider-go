@@ -17,9 +17,9 @@ func Example() {
 		log.Fatal(err)
 	}
 
-	configuration := octopus.NewOctopusFeatureConfiguration(os.Getenv("OCTOPUS_FEATURE_FLAGS_CLIENT_IDENTIFIER"), productMetadata)
+	configuration := octopus.NewConfig(os.Getenv("OCTOPUS_FEATURE_FLAGS_CLIENT_IDENTIFIER"), productMetadata)
 
-	provider, err := octopus.NewOctopusFeatureProvider(configuration)
+	provider, err := octopus.NewProvider(configuration)
 	if err != nil {
 		log.Fatal(err)
 	}

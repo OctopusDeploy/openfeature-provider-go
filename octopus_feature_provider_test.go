@@ -20,7 +20,7 @@ import (
 
 const testManifest = `[{"slug": "enabled-flag", "value": true, "reason": "The flag is enabled for this environment."}]`
 
-func newTestConfiguration(t *testing.T) *OctopusFeatureConfiguration {
+func newTestConfiguration(t *testing.T) *Config {
 	t.Helper()
 
 	metadata, err := NewProductMetadata("test-product")
@@ -28,15 +28,15 @@ func newTestConfiguration(t *testing.T) *OctopusFeatureConfiguration {
 		t.Fatal(err)
 	}
 
-	return NewOctopusFeatureConfiguration("client-identifier", metadata)
+	return NewConfig("client-identifier", metadata)
 }
 
 // startProvider registers a provider for configuration with an isolated SDK
 // API, waits for it to initialize, and returns a client bound to it.
-func startProvider(t *testing.T, configuration *OctopusFeatureConfiguration) *openfeature.Client {
+func startProvider(t *testing.T, configuration *Config) *openfeature.Client {
 	t.Helper()
 
-	provider, err := NewOctopusFeatureProvider(configuration)
+	provider, err := NewProvider(configuration)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -182,7 +182,7 @@ func TestInitFailureFallsBackToFlagNotFound(t *testing.T) {
 func TestInitWithACancelledContextFallsBackToFlagNotFound(t *testing.T) {
 	server := newFakeFeatureFlagsServer(t)
 	server.setEvaluations(fakeResponse{body: testManifest, contentHash: []byte("hash")})
-	provider, err := NewOctopusFeatureProvider(server.configuration(t))
+	provider, err := NewProvider(server.configuration(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -323,7 +323,7 @@ func TestNewDefaultHttpClientUsesAWrappedTransportAsIs(t *testing.T) {
 
 func TestProviderIsUnaffectedByLaterConfigurationChanges(t *testing.T) {
 	configuration := newTestConfiguration(t)
-	provider, err := NewOctopusFeatureProvider(configuration)
+	provider, err := NewProvider(configuration)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -335,30 +335,30 @@ func TestProviderIsUnaffectedByLaterConfigurationChanges(t *testing.T) {
 	}
 }
 
-func TestNewOctopusFeatureProviderRejectsNilConfiguration(t *testing.T) {
-	if _, err := NewOctopusFeatureProvider(nil); err == nil {
+func TestNewProviderRejectsNilConfiguration(t *testing.T) {
+	if _, err := NewProvider(nil); err == nil {
 		t.Error("expected an error for a nil configuration")
 	}
 }
 
-func TestNewOctopusFeatureProviderRejectsInvalidConfiguration(t *testing.T) {
+func TestNewProviderRejectsInvalidConfiguration(t *testing.T) {
 	tests := []struct {
 		name     string
-		modify   func(*OctopusFeatureConfiguration)
+		modify   func(*Config)
 		wantErrs []string
 	}{
-		{"empty client identifier", func(c *OctopusFeatureConfiguration) { c.ClientIdentifier = "" }, []string{"ClientIdentifier"}},
-		{"whitespace client identifier", func(c *OctopusFeatureConfiguration) { c.ClientIdentifier = "  \t" }, []string{"ClientIdentifier"}},
-		{"client identifier with a trailing newline", func(c *OctopusFeatureConfiguration) { c.ClientIdentifier = "client-identifier\n" }, []string{"ClientIdentifier"}},
-		{"release version override with a trailing line break", func(c *OctopusFeatureConfiguration) { c.ReleaseVersionOverride = "1.0\r\n" }, []string{"ReleaseVersionOverride"}},
-		{"zero-value product metadata", func(c *OctopusFeatureConfiguration) { c.ProductMetadata = ProductMetadata{} }, []string{"ProductMetadata"}},
-		{"zero cache duration", func(c *OctopusFeatureConfiguration) { c.CacheDuration = 0 }, []string{"CacheDuration"}},
-		{"negative cache duration", func(c *OctopusFeatureConfiguration) { c.CacheDuration = -time.Second }, []string{"CacheDuration"}},
-		{"zero request timeout", func(c *OctopusFeatureConfiguration) { c.RequestTimeout = 0 }, []string{"RequestTimeout"}},
-		{"negative request timeout", func(c *OctopusFeatureConfiguration) { c.RequestTimeout = -time.Second }, []string{"RequestTimeout"}},
+		{"empty client identifier", func(c *Config) { c.ClientIdentifier = "" }, []string{"ClientIdentifier"}},
+		{"whitespace client identifier", func(c *Config) { c.ClientIdentifier = "  \t" }, []string{"ClientIdentifier"}},
+		{"client identifier with a trailing newline", func(c *Config) { c.ClientIdentifier = "client-identifier\n" }, []string{"ClientIdentifier"}},
+		{"release version override with a trailing line break", func(c *Config) { c.ReleaseVersionOverride = "1.0\r\n" }, []string{"ReleaseVersionOverride"}},
+		{"zero-value product metadata", func(c *Config) { c.ProductMetadata = ProductMetadata{} }, []string{"ProductMetadata"}},
+		{"zero cache duration", func(c *Config) { c.CacheDuration = 0 }, []string{"CacheDuration"}},
+		{"negative cache duration", func(c *Config) { c.CacheDuration = -time.Second }, []string{"CacheDuration"}},
+		{"zero request timeout", func(c *Config) { c.RequestTimeout = 0 }, []string{"RequestTimeout"}},
+		{"negative request timeout", func(c *Config) { c.RequestTimeout = -time.Second }, []string{"RequestTimeout"}},
 		{
 			"every problem at once",
-			func(c *OctopusFeatureConfiguration) { *c = OctopusFeatureConfiguration{} },
+			func(c *Config) { *c = Config{} },
 			[]string{"ClientIdentifier", "ProductMetadata", "CacheDuration", "RequestTimeout"},
 		},
 	}
@@ -368,7 +368,7 @@ func TestNewOctopusFeatureProviderRejectsInvalidConfiguration(t *testing.T) {
 			configuration := newTestConfiguration(t)
 			test.modify(configuration)
 
-			provider, err := NewOctopusFeatureProvider(configuration)
+			provider, err := NewProvider(configuration)
 			if err == nil {
 				t.Fatal("expected an error")
 			}
@@ -385,13 +385,13 @@ func TestNewOctopusFeatureProviderRejectsInvalidConfiguration(t *testing.T) {
 	}
 }
 
-func TestNewOctopusFeatureProviderDefaultsServerUriForStructLiteralConfiguration(t *testing.T) {
+func TestNewProviderDefaultsServerUriForStructLiteralConfiguration(t *testing.T) {
 	metadata, err := NewProductMetadata("test-product")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	provider, err := NewOctopusFeatureProvider(&OctopusFeatureConfiguration{
+	provider, err := NewProvider(&Config{
 		ClientIdentifier: "client-identifier",
 		ProductMetadata:  metadata,
 		CacheDuration:    time.Minute,
@@ -406,12 +406,12 @@ func TestNewOctopusFeatureProviderDefaultsServerUriForStructLiteralConfiguration
 	}
 }
 
-func TestNewOctopusFeatureProviderAllowsRequestTimeoutLongerThanCacheDuration(t *testing.T) {
+func TestNewProviderAllowsRequestTimeoutLongerThanCacheDuration(t *testing.T) {
 	configuration := newTestConfiguration(t)
 	configuration.CacheDuration = time.Second
 	configuration.RequestTimeout = time.Minute
 
-	if _, err := NewOctopusFeatureProvider(configuration); err != nil {
+	if _, err := NewProvider(configuration); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 }
@@ -439,10 +439,10 @@ func (b *syncBuffer) String() string {
 
 // initProvider initializes a provider without the SDK, so tests can drive
 // its lifecycle directly.
-func initProvider(t *testing.T, configuration *OctopusFeatureConfiguration) *OctopusFeatureProvider {
+func initProvider(t *testing.T, configuration *Config) *Provider {
 	t.Helper()
 
-	provider, err := NewOctopusFeatureProvider(configuration)
+	provider, err := NewProvider(configuration)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -454,7 +454,7 @@ func initProvider(t *testing.T, configuration *OctopusFeatureConfiguration) *Oct
 	return provider
 }
 
-func evaluate(provider *OctopusFeatureProvider, slug string) openfeature.BoolResolutionDetail {
+func evaluate(provider *Provider, slug string) openfeature.BoolResolutionDetail {
 	return provider.BooleanEvaluation(context.Background(), slug, false, openfeature.FlattenedContext{})
 }
 
@@ -613,7 +613,7 @@ func TestShutdownCancelsAnInFlightRequest(t *testing.T) {
 func TestSharedProviderFetchesOnceAndShutsDownCleanly(t *testing.T) {
 	server := newFakeFeatureFlagsServer(t)
 	server.setEvaluations(fakeResponse{body: testManifest, contentHash: []byte("hash")})
-	provider, err := NewOctopusFeatureProvider(server.configuration(t))
+	provider, err := NewProvider(server.configuration(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -657,7 +657,7 @@ func TestInitAfterAnEarlierShutdownStartsNothing(t *testing.T) {
 	server := newFakeFeatureFlagsServer(t)
 	configuration := server.configuration(t)
 	configuration.CacheDuration = testCacheDuration
-	provider, err := NewOctopusFeatureProvider(configuration)
+	provider, err := NewProvider(configuration)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -682,7 +682,7 @@ func TestPollingOutlivesTheInitContext(t *testing.T) {
 	server := newFakeFeatureFlagsServer(t)
 	configuration := server.configuration(t)
 	configuration.CacheDuration = testCacheDuration
-	provider, err := NewOctopusFeatureProvider(configuration)
+	provider, err := NewProvider(configuration)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -704,7 +704,7 @@ func TestShutdownCancelsAnInitFetchQuietly(t *testing.T) {
 	configuration := server.configuration(t)
 	configuration.RequestTimeout = time.Minute
 	configuration.Logger = slog.New(slog.NewTextHandler(&logOutput, nil))
-	provider, err := NewOctopusFeatureProvider(configuration)
+	provider, err := NewProvider(configuration)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -730,7 +730,7 @@ func TestShutdownCancelsAnInitFetchQuietly(t *testing.T) {
 func TestSecondInitWaitsForTheFirstFetch(t *testing.T) {
 	server := newFakeFeatureFlagsServer(t)
 	server.setEvaluations(fakeResponse{body: testManifest, contentHash: []byte("hash"), delay: 100 * time.Millisecond})
-	provider, err := NewOctopusFeatureProvider(server.configuration(t))
+	provider, err := NewProvider(server.configuration(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -774,7 +774,7 @@ func TestShutdownLeavesAnInjectedHttpClientOpen(t *testing.T) {
 
 func TestShutdownClosesAnOwnedHttpClient(t *testing.T) {
 	server := newFakeFeatureFlagsServer(t)
-	provider, err := NewOctopusFeatureProvider(server.configuration(t))
+	provider, err := NewProvider(server.configuration(t))
 	if err != nil {
 		t.Fatal(err)
 	}

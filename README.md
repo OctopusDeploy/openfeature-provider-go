@@ -43,9 +43,9 @@ func main() {
 		log.Fatal(err)
 	}
 
-	configuration := octopus.NewOctopusFeatureConfiguration(os.Getenv("OCTOPUS_FEATURE_FLAGS_CLIENT_IDENTIFIER"), productMetadata)
+	configuration := octopus.NewConfig(os.Getenv("OCTOPUS_FEATURE_FLAGS_CLIENT_IDENTIFIER"), productMetadata)
 
-	provider, err := octopus.NewOctopusFeatureProvider(configuration)
+	provider, err := octopus.NewProvider(configuration)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -81,7 +81,7 @@ For information on using the OpenFeature client, refer to the [OpenFeature Go SD
 
 ### Configuration
 
-`NewOctopusFeatureConfiguration` sets the required options and the defaults. Set any optional fields on the configuration before you pass it to `NewOctopusFeatureProvider`. The provider keeps its own copy, so later changes have no effect.
+`NewConfig` sets the required options and the defaults. Set any optional fields on the configuration before you pass it to `NewProvider`. The provider keeps its own copy, so later changes have no effect.
 
 | Option | Required | Description |
 | --- | --- | --- |

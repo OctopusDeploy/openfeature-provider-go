@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-func TestNewOctopusFeatureConfigurationSetsDefaults(t *testing.T) {
+func TestNewConfigSetsDefaults(t *testing.T) {
 	configuration := newTestConfiguration(t)
 
 	if configuration.CacheDuration != time.Minute {
