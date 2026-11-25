@@ -1,0 +1,44 @@
+name: API compatibility
+
+on:
+  pull_request:
+    branches:
+      - main
+    # edited re-runs the check when the title gains or loses its breaking-change marker
+    types:
+      - opened
+      - edited
+      - reopened
+      - synchronize
+
+permissions:
+  contents: read
+
+jobs:
+  # Release Please only bumps the major version for a breaking-change marker, so an unmarked break would reach
+  # consumers as a minor or patch release. From v1, fixing that properly takes a new /vN module path.
+  api-compatibility:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The PR's merge commit and its first parent, the base it merges into. Comparing with the base rather than
+          # the last release only flags this PR's own breaks.
+          fetch-depth: 2
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+
+      # Pinned in its own module so it stays out of the provider's go.mod
+      - name: Install apidiff
+        working-directory: .github/tools
+        run: |
+          go build -o "$RUNNER_TEMP/bin/apidiff" golang.org/x/exp/cmd/apidiff
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+
+      - name: Check incompatible API changes are marked as breaking
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: .github/scripts/check-api-compatibility.sh HEAD^1 "$PR_TITLE"
