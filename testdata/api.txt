@@ -1,27 +1,27 @@
-pkg octopus, func NewConfig(string, ProductMetadata) *Config
+pkg octopus, func NewFeatureConfiguration(string, ProductMetadata) *FeatureConfiguration
+pkg octopus, func NewFeatureProvider(*FeatureConfiguration) (*FeatureProvider, error)
 pkg octopus, func NewProductMetadata(string) (ProductMetadata, error)
 pkg octopus, func NewProductMetadataWithVersion(string, string) (ProductMetadata, error)
-pkg octopus, func NewProvider(*Config) (*Provider, error)
-pkg octopus, method (*Provider) BooleanEvaluation(context.Context, string, bool, openfeature.FlattenedContext) openfeature.BoolResolutionDetail
-pkg octopus, method (*Provider) FloatEvaluation(context.Context, string, float64, openfeature.FlattenedContext) openfeature.FloatResolutionDetail
-pkg octopus, method (*Provider) Hooks() []openfeature.Hook
-pkg octopus, method (*Provider) Init(openfeature.EvaluationContext) error
-pkg octopus, method (*Provider) InitWithContext(context.Context, openfeature.EvaluationContext) error
-pkg octopus, method (*Provider) IntEvaluation(context.Context, string, int64, openfeature.FlattenedContext) openfeature.IntResolutionDetail
-pkg octopus, method (*Provider) Metadata() openfeature.Metadata
-pkg octopus, method (*Provider) ObjectEvaluation(context.Context, string, any, openfeature.FlattenedContext) openfeature.InterfaceResolutionDetail
-pkg octopus, method (*Provider) Shutdown()
-pkg octopus, method (*Provider) ShutdownWithContext(context.Context) error
-pkg octopus, method (*Provider) StringEvaluation(context.Context, string, string, openfeature.FlattenedContext) openfeature.StringResolutionDetail
+pkg octopus, method (*FeatureProvider) BooleanEvaluation(context.Context, string, bool, openfeature.FlattenedContext) openfeature.BoolResolutionDetail
+pkg octopus, method (*FeatureProvider) FloatEvaluation(context.Context, string, float64, openfeature.FlattenedContext) openfeature.FloatResolutionDetail
+pkg octopus, method (*FeatureProvider) Hooks() []openfeature.Hook
+pkg octopus, method (*FeatureProvider) Init(openfeature.EvaluationContext) error
+pkg octopus, method (*FeatureProvider) InitWithContext(context.Context, openfeature.EvaluationContext) error
+pkg octopus, method (*FeatureProvider) IntEvaluation(context.Context, string, int64, openfeature.FlattenedContext) openfeature.IntResolutionDetail
+pkg octopus, method (*FeatureProvider) Metadata() openfeature.Metadata
+pkg octopus, method (*FeatureProvider) ObjectEvaluation(context.Context, string, any, openfeature.FlattenedContext) openfeature.InterfaceResolutionDetail
+pkg octopus, method (*FeatureProvider) Shutdown()
+pkg octopus, method (*FeatureProvider) ShutdownWithContext(context.Context) error
+pkg octopus, method (*FeatureProvider) StringEvaluation(context.Context, string, string, openfeature.FlattenedContext) openfeature.StringResolutionDetail
 pkg octopus, method (ProductMetadata) Name() string
 pkg octopus, method (ProductMetadata) Version() string
-pkg octopus, type Config struct
-pkg octopus, type Config struct, CacheDuration time.Duration
-pkg octopus, type Config struct, ClientIdentifier string
-pkg octopus, type Config struct, HTTPClient *http.Client
-pkg octopus, type Config struct, Logger *slog.Logger
-pkg octopus, type Config struct, ProductMetadata ProductMetadata
-pkg octopus, type Config struct, ReleaseVersionOverride string
-pkg octopus, type Config struct, RequestTimeout time.Duration
+pkg octopus, type FeatureConfiguration struct
+pkg octopus, type FeatureConfiguration struct, CacheDuration time.Duration
+pkg octopus, type FeatureConfiguration struct, ClientIdentifier string
+pkg octopus, type FeatureConfiguration struct, HTTPClient *http.Client
+pkg octopus, type FeatureConfiguration struct, Logger *slog.Logger
+pkg octopus, type FeatureConfiguration struct, ProductMetadata ProductMetadata
+pkg octopus, type FeatureConfiguration struct, ReleaseVersionOverride string
+pkg octopus, type FeatureConfiguration struct, RequestTimeout time.Duration
+pkg octopus, type FeatureProvider struct
 pkg octopus, type ProductMetadata struct
-pkg octopus, type Provider struct

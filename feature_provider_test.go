@@ -20,7 +20,7 @@ import (
 
 const testManifest = `[{"slug": "enabled-flag", "value": true, "reason": "The flag is enabled for this environment."}]`
 
-func newTestConfiguration(t *testing.T) *Config {
+func newTestConfiguration(t *testing.T) *FeatureConfiguration {
 	t.Helper()
 
 	metadata, err := NewProductMetadata("test-product")
@@ -28,15 +28,15 @@ func newTestConfiguration(t *testing.T) *Config {
 		t.Fatal(err)
 	}
 
-	return NewConfig("client-identifier", metadata)
+	return NewFeatureConfiguration("client-identifier", metadata)
 }
 
 // startProvider registers a provider for configuration with an isolated SDK
 // API, waits for it to initialize, and returns a client bound to it.
-func startProvider(t *testing.T, configuration *Config) *openfeature.Client {
+func startProvider(t *testing.T, configuration *FeatureConfiguration) *openfeature.Client {
 	t.Helper()
 
-	provider, err := NewProvider(configuration)
+	provider, err := NewFeatureProvider(configuration)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -182,7 +182,7 @@ func TestInitFailureFallsBackToFlagNotFound(t *testing.T) {
 func TestInitWithACancelledContextFallsBackToFlagNotFound(t *testing.T) {
 	server := newFakeFeatureFlagsServer(t)
 	server.setEvaluations(fakeResponse{body: testManifest, contentHash: []byte("hash")})
-	provider, err := NewProvider(server.configuration(t))
+	provider, err := NewFeatureProvider(server.configuration(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -323,7 +323,7 @@ func TestNewDefaultHttpClientUsesAWrappedTransportAsIs(t *testing.T) {
 
 func TestProviderIsUnaffectedByLaterConfigurationChanges(t *testing.T) {
 	configuration := newTestConfiguration(t)
-	provider, err := NewProvider(configuration)
+	provider, err := NewFeatureProvider(configuration)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -335,30 +335,30 @@ func TestProviderIsUnaffectedByLaterConfigurationChanges(t *testing.T) {
 	}
 }
 
-func TestNewProviderRejectsNilConfiguration(t *testing.T) {
-	if _, err := NewProvider(nil); err == nil {
+func TestNewFeatureProviderRejectsNilConfiguration(t *testing.T) {
+	if _, err := NewFeatureProvider(nil); err == nil {
 		t.Error("expected an error for a nil configuration")
 	}
 }
 
-func TestNewProviderRejectsInvalidConfiguration(t *testing.T) {
+func TestNewFeatureProviderRejectsInvalidConfiguration(t *testing.T) {
 	tests := []struct {
 		name     string
-		modify   func(*Config)
+		modify   func(*FeatureConfiguration)
 		wantErrs []string
 	}{
-		{"empty client identifier", func(c *Config) { c.ClientIdentifier = "" }, []string{"ClientIdentifier"}},
-		{"whitespace client identifier", func(c *Config) { c.ClientIdentifier = "  \t" }, []string{"ClientIdentifier"}},
-		{"client identifier with a trailing newline", func(c *Config) { c.ClientIdentifier = "client-identifier\n" }, []string{"ClientIdentifier"}},
-		{"release version override with a trailing line break", func(c *Config) { c.ReleaseVersionOverride = "1.0\r\n" }, []string{"ReleaseVersionOverride"}},
-		{"zero-value product metadata", func(c *Config) { c.ProductMetadata = ProductMetadata{} }, []string{"ProductMetadata"}},
-		{"zero cache duration", func(c *Config) { c.CacheDuration = 0 }, []string{"CacheDuration"}},
-		{"negative cache duration", func(c *Config) { c.CacheDuration = -time.Second }, []string{"CacheDuration"}},
-		{"zero request timeout", func(c *Config) { c.RequestTimeout = 0 }, []string{"RequestTimeout"}},
-		{"negative request timeout", func(c *Config) { c.RequestTimeout = -time.Second }, []string{"RequestTimeout"}},
+		{"empty client identifier", func(c *FeatureConfiguration) { c.ClientIdentifier = "" }, []string{"ClientIdentifier"}},
+		{"whitespace client identifier", func(c *FeatureConfiguration) { c.ClientIdentifier = "  \t" }, []string{"ClientIdentifier"}},
+		{"client identifier with a trailing newline", func(c *FeatureConfiguration) { c.ClientIdentifier = "client-identifier\n" }, []string{"ClientIdentifier"}},
+		{"release version override with a trailing line break", func(c *FeatureConfiguration) { c.ReleaseVersionOverride = "1.0\r\n" }, []string{"ReleaseVersionOverride"}},
+		{"zero-value product metadata", func(c *FeatureConfiguration) { c.ProductMetadata = ProductMetadata{} }, []string{"ProductMetadata"}},
+		{"zero cache duration", func(c *FeatureConfiguration) { c.CacheDuration = 0 }, []string{"CacheDuration"}},
+		{"negative cache duration", func(c *FeatureConfiguration) { c.CacheDuration = -time.Second }, []string{"CacheDuration"}},
+		{"zero request timeout", func(c *FeatureConfiguration) { c.RequestTimeout = 0 }, []string{"RequestTimeout"}},
+		{"negative request timeout", func(c *FeatureConfiguration) { c.RequestTimeout = -time.Second }, []string{"RequestTimeout"}},
 		{
 			"every problem at once",
-			func(c *Config) { *c = Config{} },
+			func(c *FeatureConfiguration) { *c = FeatureConfiguration{} },
 			[]string{"ClientIdentifier", "ProductMetadata", "CacheDuration", "RequestTimeout"},
 		},
 	}
@@ -368,7 +368,7 @@ func TestNewProviderRejectsInvalidConfiguration(t *testing.T) {
 			configuration := newTestConfiguration(t)
 			test.modify(configuration)
 
-			provider, err := NewProvider(configuration)
+			provider, err := NewFeatureProvider(configuration)
 			if err == nil {
 				t.Fatal("expected an error")
 			}
@@ -385,13 +385,13 @@ func TestNewProviderRejectsInvalidConfiguration(t *testing.T) {
 	}
 }
 
-func TestNewProviderDefaultsServerURIForStructLiteralConfiguration(t *testing.T) {
+func TestNewFeatureProviderDefaultsServerURIForStructLiteralConfiguration(t *testing.T) {
 	metadata, err := NewProductMetadata("test-product")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	provider, err := NewProvider(&Config{
+	provider, err := NewFeatureProvider(&FeatureConfiguration{
 		ClientIdentifier: "client-identifier",
 		ProductMetadata:  metadata,
 		CacheDuration:    time.Minute,
@@ -406,12 +406,12 @@ func TestNewProviderDefaultsServerURIForStructLiteralConfiguration(t *testing.T)
 	}
 }
 
-func TestNewProviderAllowsRequestTimeoutLongerThanCacheDuration(t *testing.T) {
+func TestNewFeatureProviderAllowsRequestTimeoutLongerThanCacheDuration(t *testing.T) {
 	configuration := newTestConfiguration(t)
 	configuration.CacheDuration = time.Second
 	configuration.RequestTimeout = time.Minute
 
-	if _, err := NewProvider(configuration); err != nil {
+	if _, err := NewFeatureProvider(configuration); err != nil {
 		t.Errorf("unexpected error: %v", err)
 	}
 }
@@ -439,10 +439,10 @@ func (b *syncBuffer) String() string {
 
 // initProvider initializes a provider without the SDK, so tests can drive
 // its lifecycle directly.
-func initProvider(t *testing.T, configuration *Config) *Provider {
+func initProvider(t *testing.T, configuration *FeatureConfiguration) *FeatureProvider {
 	t.Helper()
 
-	provider, err := NewProvider(configuration)
+	provider, err := NewFeatureProvider(configuration)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -454,7 +454,7 @@ func initProvider(t *testing.T, configuration *Config) *Provider {
 	return provider
 }
 
-func evaluate(provider *Provider, slug string) openfeature.BoolResolutionDetail {
+func evaluate(provider *FeatureProvider, slug string) openfeature.BoolResolutionDetail {
 	return provider.BooleanEvaluation(context.Background(), slug, false, openfeature.FlattenedContext{})
 }
 
@@ -613,7 +613,7 @@ func TestShutdownCancelsAnInFlightRequest(t *testing.T) {
 func TestSharedProviderFetchesOnceAndShutsDownCleanly(t *testing.T) {
 	server := newFakeFeatureFlagsServer(t)
 	server.setEvaluations(fakeResponse{body: testManifest, contentHash: []byte("hash")})
-	provider, err := NewProvider(server.configuration(t))
+	provider, err := NewFeatureProvider(server.configuration(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -657,7 +657,7 @@ func TestInitAfterAnEarlierShutdownStartsNothing(t *testing.T) {
 	server := newFakeFeatureFlagsServer(t)
 	configuration := server.configuration(t)
 	configuration.CacheDuration = testCacheDuration
-	provider, err := NewProvider(configuration)
+	provider, err := NewFeatureProvider(configuration)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -682,7 +682,7 @@ func TestPollingOutlivesTheInitContext(t *testing.T) {
 	server := newFakeFeatureFlagsServer(t)
 	configuration := server.configuration(t)
 	configuration.CacheDuration = testCacheDuration
-	provider, err := NewProvider(configuration)
+	provider, err := NewFeatureProvider(configuration)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -704,7 +704,7 @@ func TestShutdownCancelsAnInitFetchQuietly(t *testing.T) {
 	configuration := server.configuration(t)
 	configuration.RequestTimeout = time.Minute
 	configuration.Logger = slog.New(slog.NewTextHandler(&logOutput, nil))
-	provider, err := NewProvider(configuration)
+	provider, err := NewFeatureProvider(configuration)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -730,7 +730,7 @@ func TestShutdownCancelsAnInitFetchQuietly(t *testing.T) {
 func TestSecondInitWaitsForTheFirstFetch(t *testing.T) {
 	server := newFakeFeatureFlagsServer(t)
 	server.setEvaluations(fakeResponse{body: testManifest, contentHash: []byte("hash"), delay: 100 * time.Millisecond})
-	provider, err := NewProvider(server.configuration(t))
+	provider, err := NewFeatureProvider(server.configuration(t))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -774,7 +774,7 @@ func TestShutdownLeavesAnInjectedHTTPClientOpen(t *testing.T) {
 
 func TestShutdownClosesAnOwnedHttpClient(t *testing.T) {
 	server := newFakeFeatureFlagsServer(t)
-	provider, err := NewProvider(server.configuration(t))
+	provider, err := NewFeatureProvider(server.configuration(t))
 	if err != nil {
 		t.Fatal(err)
 	}

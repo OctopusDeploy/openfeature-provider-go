@@ -11,9 +11,10 @@ import (
 
 const defaultServerUri = "https://features.octopus.com"
 
-// Config configures a [Provider]. Create one with [NewConfig], then assign
-// any optional fields before passing it to [NewProvider].
-type Config struct {
+// FeatureConfiguration configures a [FeatureProvider]. Create one with
+// [NewFeatureConfiguration], then assign any optional fields before passing
+// it to [NewFeatureProvider].
+type FeatureConfiguration struct {
 	// ClientIdentifier is the value of the Octopus variable
 	// Octopus.FeatureFlags.ClientIdentifier.
 	ClientIdentifier string
@@ -49,10 +50,10 @@ type Config struct {
 	serverURI string
 }
 
-// NewConfig returns a configuration with the required values set and every
-// optional field at its default.
-func NewConfig(clientIdentifier string, productMetadata ProductMetadata) *Config {
-	return &Config{
+// NewFeatureConfiguration returns a configuration with the required values
+// set and every optional field at its default.
+func NewFeatureConfiguration(clientIdentifier string, productMetadata ProductMetadata) *FeatureConfiguration {
+	return &FeatureConfiguration{
 		ClientIdentifier: clientIdentifier,
 		ProductMetadata:  productMetadata,
 		CacheDuration:    time.Minute,
@@ -61,7 +62,7 @@ func NewConfig(clientIdentifier string, productMetadata ProductMetadata) *Config
 	}
 }
 
-func (c *Config) validate() error {
+func (c *FeatureConfiguration) validate() error {
 	var errs []error
 
 	if strings.TrimSpace(c.ClientIdentifier) == "" {

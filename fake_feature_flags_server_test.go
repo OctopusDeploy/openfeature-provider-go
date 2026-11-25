@@ -57,7 +57,7 @@ func newFakeFeatureFlagsServer(t *testing.T) *fakeFeatureFlagsServer {
 }
 
 // configuration returns a test configuration that points at the server.
-func (s *fakeFeatureFlagsServer) configuration(t *testing.T) *Config {
+func (s *fakeFeatureFlagsServer) configuration(t *testing.T) *FeatureConfiguration {
 	t.Helper()
 
 	configuration := newTestConfiguration(t)

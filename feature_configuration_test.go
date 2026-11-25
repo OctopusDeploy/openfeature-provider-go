@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-func TestNewConfigSetsDefaults(t *testing.T) {
+func TestNewFeatureConfigurationSetsDefaults(t *testing.T) {
 	configuration := newTestConfiguration(t)
 
 	if configuration.CacheDuration != time.Minute {
