@@ -1,27 +1,27 @@
-pkg octopus, func NewOctopusFeatureConfiguration(string, ProductMetadata) *OctopusFeatureConfiguration
-pkg octopus, func NewOctopusFeatureProvider(*OctopusFeatureConfiguration) (*OctopusFeatureProvider, error)
+pkg octopus, func NewFeatureConfiguration(string, ProductMetadata) *FeatureConfiguration
+pkg octopus, func NewFeatureProvider(*FeatureConfiguration) (*FeatureProvider, error)
 pkg octopus, func NewProductMetadata(string) (ProductMetadata, error)
 pkg octopus, func NewProductMetadataWithVersion(string, string) (ProductMetadata, error)
-pkg octopus, method (*OctopusFeatureProvider) BooleanEvaluation(context.Context, string, bool, openfeature.FlattenedContext) openfeature.BoolResolutionDetail
-pkg octopus, method (*OctopusFeatureProvider) FloatEvaluation(context.Context, string, float64, openfeature.FlattenedContext) openfeature.FloatResolutionDetail
-pkg octopus, method (*OctopusFeatureProvider) Hooks() []openfeature.Hook
-pkg octopus, method (*OctopusFeatureProvider) Init(openfeature.EvaluationContext) error
-pkg octopus, method (*OctopusFeatureProvider) InitWithContext(context.Context, openfeature.EvaluationContext) error
-pkg octopus, method (*OctopusFeatureProvider) IntEvaluation(context.Context, string, int64, openfeature.FlattenedContext) openfeature.IntResolutionDetail
-pkg octopus, method (*OctopusFeatureProvider) Metadata() openfeature.Metadata
-pkg octopus, method (*OctopusFeatureProvider) ObjectEvaluation(context.Context, string, any, openfeature.FlattenedContext) openfeature.InterfaceResolutionDetail
-pkg octopus, method (*OctopusFeatureProvider) Shutdown()
-pkg octopus, method (*OctopusFeatureProvider) ShutdownWithContext(context.Context) error
-pkg octopus, method (*OctopusFeatureProvider) StringEvaluation(context.Context, string, string, openfeature.FlattenedContext) openfeature.StringResolutionDetail
+pkg octopus, method (*FeatureProvider) BooleanEvaluation(context.Context, string, bool, openfeature.FlattenedContext) openfeature.BoolResolutionDetail
+pkg octopus, method (*FeatureProvider) FloatEvaluation(context.Context, string, float64, openfeature.FlattenedContext) openfeature.FloatResolutionDetail
+pkg octopus, method (*FeatureProvider) Hooks() []openfeature.Hook
+pkg octopus, method (*FeatureProvider) Init(openfeature.EvaluationContext) error
+pkg octopus, method (*FeatureProvider) InitWithContext(context.Context, openfeature.EvaluationContext) error
+pkg octopus, method (*FeatureProvider) IntEvaluation(context.Context, string, int64, openfeature.FlattenedContext) openfeature.IntResolutionDetail
+pkg octopus, method (*FeatureProvider) Metadata() openfeature.Metadata
+pkg octopus, method (*FeatureProvider) ObjectEvaluation(context.Context, string, any, openfeature.FlattenedContext) openfeature.InterfaceResolutionDetail
+pkg octopus, method (*FeatureProvider) Shutdown()
+pkg octopus, method (*FeatureProvider) ShutdownWithContext(context.Context) error
+pkg octopus, method (*FeatureProvider) StringEvaluation(context.Context, string, string, openfeature.FlattenedContext) openfeature.StringResolutionDetail
 pkg octopus, method (ProductMetadata) Name() string
 pkg octopus, method (ProductMetadata) Version() string
-pkg octopus, type OctopusFeatureConfiguration struct
-pkg octopus, type OctopusFeatureConfiguration struct, CacheDuration time.Duration
-pkg octopus, type OctopusFeatureConfiguration struct, ClientIdentifier string
-pkg octopus, type OctopusFeatureConfiguration struct, HttpClient *http.Client
-pkg octopus, type OctopusFeatureConfiguration struct, Logger *slog.Logger
-pkg octopus, type OctopusFeatureConfiguration struct, ProductMetadata ProductMetadata
-pkg octopus, type OctopusFeatureConfiguration struct, ReleaseVersionOverride string
-pkg octopus, type OctopusFeatureConfiguration struct, RequestTimeout time.Duration
-pkg octopus, type OctopusFeatureProvider struct
+pkg octopus, type FeatureConfiguration struct
+pkg octopus, type FeatureConfiguration struct, CacheDuration time.Duration
+pkg octopus, type FeatureConfiguration struct, ClientIdentifier string
+pkg octopus, type FeatureConfiguration struct, HTTPClient *http.Client
+pkg octopus, type FeatureConfiguration struct, Logger *slog.Logger
+pkg octopus, type FeatureConfiguration struct, ProductMetadata ProductMetadata
+pkg octopus, type FeatureConfiguration struct, ReleaseVersionOverride string
+pkg octopus, type FeatureConfiguration struct, RequestTimeout time.Duration
+pkg octopus, type FeatureProvider struct
 pkg octopus, type ProductMetadata struct

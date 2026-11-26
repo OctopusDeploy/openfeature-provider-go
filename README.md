@@ -43,9 +43,9 @@ func main() {
 		log.Fatal(err)
 	}
 
-	configuration := octopus.NewOctopusFeatureConfiguration(os.Getenv("OCTOPUS_FEATURE_FLAGS_CLIENT_IDENTIFIER"), productMetadata)
+	configuration := octopus.NewFeatureConfiguration(os.Getenv("OCTOPUS_FEATURE_FLAGS_CLIENT_IDENTIFIER"), productMetadata)
 
-	provider, err := octopus.NewOctopusFeatureProvider(configuration)
+	provider, err := octopus.NewFeatureProvider(configuration)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -75,13 +75,13 @@ The provider fetches flags when it initializes. If it can't retrieve them, `SetP
 
 After that, it checks for changes every `CacheDuration` and fetches the flags again only when they have changed. If a check fails, the provider keeps evaluating against the flags it already has and tries again at the next interval.
 
-`openfeature.Shutdown()` stops the polling and closes the idle connections of the HTTP client the provider created. It never closes an `HttpClient` you provide.
+`openfeature.Shutdown()` stops the polling and closes the idle connections of the HTTP client the provider created. It never closes an `HTTPClient` you provide.
 
 For information on using the OpenFeature client, refer to the [OpenFeature Go SDK documentation](https://openfeature.dev/docs/reference/technologies/server/go/).
 
 ### Configuration
 
-`NewOctopusFeatureConfiguration` sets the required options and the defaults. Set any optional fields on the configuration before you pass it to `NewOctopusFeatureProvider`. The provider keeps its own copy, so later changes have no effect.
+`NewFeatureConfiguration` sets the required options and the defaults. Set any optional fields on the configuration before you pass it to `NewFeatureProvider`. The provider keeps its own copy, so later changes have no effect.
 
 | Option | Required | Description |
 | --- | --- | --- |
@@ -91,12 +91,12 @@ For information on using the OpenFeature client, refer to the [OpenFeature Go SD
 | `RequestTimeout` | No | How long a request to Octopus may take before it's abandoned. Defaults to 10 seconds. Must be greater than 0, and should be well under `CacheDuration`. |
 | `ReleaseVersionOverride` | No | Overrides the release version embedded in the client identifier. Must not contain line breaks or other control characters. |
 | `Logger` | No | A `*slog.Logger` for the provider's own log messages. If it's nil, the provider logs nothing. |
-| `HttpClient` | No | The `*http.Client` for requests to Octopus. If it's nil, the provider creates its own. |
+| `HTTPClient` | No | The `*http.Client` for requests to Octopus. If it's nil, the provider creates its own. |
 
-Provide an `HttpClient` to add tracing, a proxy or custom TLS. For example, to trace requests with [OpenTelemetry](https://pkg.go.dev/go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp):
+Provide an `HTTPClient` to add tracing, a proxy or custom TLS. For example, to trace requests with [OpenTelemetry](https://pkg.go.dev/go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp):
 
 ```go
-configuration.HttpClient = &http.Client{Transport: otelhttp.NewTransport(http.DefaultTransport)}
+configuration.HTTPClient = &http.Client{Transport: otelhttp.NewTransport(http.DefaultTransport)}
 ```
 
 ## Contributing

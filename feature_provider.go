@@ -16,31 +16,31 @@ const (
 )
 
 var (
-	_ openfeature.FeatureProvider          = (*OctopusFeatureProvider)(nil)
-	_ openfeature.ContextAwareStateHandler = (*OctopusFeatureProvider)(nil)
+	_ openfeature.FeatureProvider          = (*FeatureProvider)(nil)
+	_ openfeature.ContextAwareStateHandler = (*FeatureProvider)(nil)
 )
 
-// OctopusFeatureProvider is an OpenFeature provider for Octopus feature
-// flags. Create one with [NewOctopusFeatureProvider] and register it with the
-// OpenFeature SDK.
-type OctopusFeatureProvider struct {
-	configuration  OctopusFeatureConfiguration
+// FeatureProvider is an OpenFeature provider for Octopus feature flags.
+// Create one with [NewFeatureProvider] and register it with the OpenFeature
+// SDK.
+type FeatureProvider struct {
+	configuration  FeatureConfiguration
 	evaluatorCache *featureflags.FeatureFlagEvaluatorCache
 
 	// Nil when the provider doesn't own the client's transport: the caller
-	// supplied HttpClient, or the application has wrapped
+	// supplied HTTPClient, or the application has wrapped
 	// http.DefaultTransport.
-	ownedHttpClient *http.Client
+	ownedHTTPClient *http.Client
 }
 
-// NewOctopusFeatureProvider returns a provider for the given configuration.
+// NewFeatureProvider returns a provider for the given configuration.
 // It returns an error if ClientIdentifier is empty, ClientIdentifier or
 // ReleaseVersionOverride contains a line break or other control character,
 // ProductMetadata wasn't created with one of its constructors, or
 // CacheDuration or RequestTimeout isn't positive. The provider keeps its own
 // copy, so changes to configuration afterwards have no effect on it. It makes
 // no requests until the SDK initializes it.
-func NewOctopusFeatureProvider(configuration *OctopusFeatureConfiguration) (*OctopusFeatureProvider, error) {
+func NewFeatureProvider(configuration *FeatureConfiguration) (*FeatureProvider, error) {
 	if configuration == nil {
 		return nil, errors.New("configuration must not be nil")
 	}
@@ -48,10 +48,10 @@ func NewOctopusFeatureProvider(configuration *OctopusFeatureConfiguration) (*Oct
 		return nil, err
 	}
 
-	provider := &OctopusFeatureProvider{configuration: *configuration}
+	provider := &FeatureProvider{configuration: *configuration}
 	// A configuration built as a struct literal skips the constructor's default.
-	if provider.configuration.serverUri == "" {
-		provider.configuration.serverUri = defaultServerUri
+	if provider.configuration.serverURI == "" {
+		provider.configuration.serverURI = defaultServerURI
 	}
 
 	logger := provider.configuration.Logger
@@ -60,17 +60,17 @@ func NewOctopusFeatureProvider(configuration *OctopusFeatureConfiguration) (*Oct
 	}
 	logger = logger.With(slog.String("provider", providerName))
 
-	httpClient := provider.configuration.HttpClient
+	httpClient := provider.configuration.HTTPClient
 	if httpClient == nil {
 		var owned bool
-		httpClient, owned = newDefaultHttpClient(http.DefaultTransport)
+		httpClient, owned = newDefaultHTTPClient(http.DefaultTransport)
 		if owned {
-			provider.ownedHttpClient = httpClient
+			provider.ownedHTTPClient = httpClient
 		}
 	}
 
 	apiClient := featureflags.NewFeatureFlagApiClient(featureflags.FeatureFlagApiClientOptions{
-		ServerUri:              provider.configuration.serverUri,
+		ServerUri:              provider.configuration.serverURI,
 		ClientIdentifier:       provider.configuration.ClientIdentifier,
 		ProductName:            provider.configuration.ProductMetadata.Name(),
 		ProductVersion:         provider.configuration.ProductMetadata.Version(),
@@ -84,12 +84,12 @@ func NewOctopusFeatureProvider(configuration *OctopusFeatureConfiguration) (*Oct
 	return provider, nil
 }
 
-// newDefaultHttpClient returns the client used when none is configured. A
+// newDefaultHTTPClient returns the client used when none is configured. A
 // plain transport is cloned, so closing its idle connections on shutdown
 // can't affect anything else that shares it. A wrapped one, for example for
 // tracing, is used as-is so requests still go through the wrapper, and isn't
 // owned.
-func newDefaultHttpClient(base http.RoundTripper) (client *http.Client, owned bool) {
+func newDefaultHTTPClient(base http.RoundTripper) (client *http.Client, owned bool) {
 	if transport, ok := base.(*http.Transport); ok {
 		return &http.Client{Transport: transport.Clone()}, true
 	}
@@ -98,17 +98,17 @@ func newDefaultHttpClient(base http.RoundTripper) (client *http.Client, owned bo
 }
 
 // Metadata implements [openfeature.FeatureProvider].
-func (p *OctopusFeatureProvider) Metadata() openfeature.Metadata {
+func (p *FeatureProvider) Metadata() openfeature.Metadata {
 	return openfeature.Metadata{Name: providerName}
 }
 
 // Hooks implements [openfeature.FeatureProvider].
-func (p *OctopusFeatureProvider) Hooks() []openfeature.Hook {
+func (p *FeatureProvider) Hooks() []openfeature.Hook {
 	return nil
 }
 
 // Init implements [openfeature.StateHandler].
-func (p *OctopusFeatureProvider) Init(evaluationContext openfeature.EvaluationContext) error {
+func (p *FeatureProvider) Init(evaluationContext openfeature.EvaluationContext) error {
 	return p.InitWithContext(context.Background(), evaluationContext)
 }
 
@@ -120,12 +120,12 @@ func (p *OctopusFeatureProvider) Init(evaluationContext openfeature.EvaluationCo
 // while the provider is running waits for the first fetch and starts nothing
 // new. After shutdown it returns an error, because a provider can't be
 // initialized again.
-func (p *OctopusFeatureProvider) InitWithContext(ctx context.Context, _ openfeature.EvaluationContext) error {
+func (p *FeatureProvider) InitWithContext(ctx context.Context, _ openfeature.EvaluationContext) error {
 	return p.evaluatorCache.Start(ctx)
 }
 
 // Shutdown implements [openfeature.StateHandler].
-func (p *OctopusFeatureProvider) Shutdown() {
+func (p *FeatureProvider) Shutdown() {
 	_ = p.ShutdownWithContext(context.Background())
 }
 
@@ -135,46 +135,46 @@ func (p *OctopusFeatureProvider) Shutdown() {
 // ctx ends first. Evaluations keep using the last feature flags fetched. It
 // can be called more than once, and the provider can't be initialized again
 // afterwards.
-func (p *OctopusFeatureProvider) ShutdownWithContext(ctx context.Context) error {
+func (p *FeatureProvider) ShutdownWithContext(ctx context.Context) error {
 	err := p.evaluatorCache.Shutdown(ctx)
 
-	if p.ownedHttpClient != nil {
-		p.ownedHttpClient.CloseIdleConnections()
+	if p.ownedHTTPClient != nil {
+		p.ownedHTTPClient.CloseIdleConnections()
 	}
 
 	return err
 }
 
 // BooleanEvaluation implements [openfeature.FeatureProvider].
-func (p *OctopusFeatureProvider) BooleanEvaluation(_ context.Context, flag string, defaultValue bool, flatCtx openfeature.FlattenedContext) openfeature.BoolResolutionDetail {
+func (p *FeatureProvider) BooleanEvaluation(_ context.Context, flag string, defaultValue bool, flatCtx openfeature.FlattenedContext) openfeature.BoolResolutionDetail {
 	return p.evaluatorCache.GetEvaluator().Evaluate(flag, defaultValue, flatCtx)
 }
 
 // StringEvaluation implements [openfeature.FeatureProvider]. Octopus only
 // supports boolean flags, so it always returns the default.
-func (p *OctopusFeatureProvider) StringEvaluation(_ context.Context, flag string, defaultValue string, _ openfeature.FlattenedContext) openfeature.StringResolutionDetail {
+func (p *FeatureProvider) StringEvaluation(_ context.Context, flag string, defaultValue string, _ openfeature.FlattenedContext) openfeature.StringResolutionDetail {
 	return openfeature.StringResolutionDetail{Value: defaultValue, ProviderResolutionDetail: p.rejectNonBooleanEvaluation(flag)}
 }
 
 // FloatEvaluation implements [openfeature.FeatureProvider]. Octopus only
 // supports boolean flags, so it always returns the default.
-func (p *OctopusFeatureProvider) FloatEvaluation(_ context.Context, flag string, defaultValue float64, _ openfeature.FlattenedContext) openfeature.FloatResolutionDetail {
+func (p *FeatureProvider) FloatEvaluation(_ context.Context, flag string, defaultValue float64, _ openfeature.FlattenedContext) openfeature.FloatResolutionDetail {
 	return openfeature.FloatResolutionDetail{Value: defaultValue, ProviderResolutionDetail: p.rejectNonBooleanEvaluation(flag)}
 }
 
 // IntEvaluation implements [openfeature.FeatureProvider]. Octopus only
 // supports boolean flags, so it always returns the default.
-func (p *OctopusFeatureProvider) IntEvaluation(_ context.Context, flag string, defaultValue int64, _ openfeature.FlattenedContext) openfeature.IntResolutionDetail {
+func (p *FeatureProvider) IntEvaluation(_ context.Context, flag string, defaultValue int64, _ openfeature.FlattenedContext) openfeature.IntResolutionDetail {
 	return openfeature.IntResolutionDetail{Value: defaultValue, ProviderResolutionDetail: p.rejectNonBooleanEvaluation(flag)}
 }
 
 // ObjectEvaluation implements [openfeature.FeatureProvider]. Octopus only
 // supports boolean flags, so it always returns the default.
-func (p *OctopusFeatureProvider) ObjectEvaluation(_ context.Context, flag string, defaultValue any, _ openfeature.FlattenedContext) openfeature.InterfaceResolutionDetail {
+func (p *FeatureProvider) ObjectEvaluation(_ context.Context, flag string, defaultValue any, _ openfeature.FlattenedContext) openfeature.InterfaceResolutionDetail {
 	return openfeature.InterfaceResolutionDetail{Value: defaultValue, ProviderResolutionDetail: p.rejectNonBooleanEvaluation(flag)}
 }
 
-func (p *OctopusFeatureProvider) rejectNonBooleanEvaluation(flag string) openfeature.ProviderResolutionDetail {
+func (p *FeatureProvider) rejectNonBooleanEvaluation(flag string) openfeature.ProviderResolutionDetail {
 	err := openfeature.NewTypeMismatchResolutionError("Octopus only supports boolean flags.")
 	if _, found := p.evaluatorCache.GetEvaluator().FindEvaluationBySlug(flag); !found {
 		err = openfeature.NewFlagNotFoundResolutionError(flagNotFoundMessage)

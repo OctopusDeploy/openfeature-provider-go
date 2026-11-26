@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-func TestNewOctopusFeatureConfigurationSetsDefaults(t *testing.T) {
+func TestNewFeatureConfigurationSetsDefaults(t *testing.T) {
 	configuration := newTestConfiguration(t)
 
 	if configuration.CacheDuration != time.Minute {
@@ -14,7 +14,7 @@ func TestNewOctopusFeatureConfigurationSetsDefaults(t *testing.T) {
 	if configuration.RequestTimeout != 10*time.Second {
 		t.Errorf("RequestTimeout = %v, want %v", configuration.RequestTimeout, 10*time.Second)
 	}
-	if configuration.serverUri != "https://features.octopus.com" {
-		t.Errorf("serverUri = %q, want %q", configuration.serverUri, "https://features.octopus.com")
+	if configuration.serverURI != "https://features.octopus.com" {
+		t.Errorf("serverURI = %q, want %q", configuration.serverURI, "https://features.octopus.com")
 	}
 }

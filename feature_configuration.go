@@ -9,12 +9,12 @@ import (
 	"time"
 )
 
-const defaultServerUri = "https://features.octopus.com"
+const defaultServerURI = "https://features.octopus.com"
 
-// OctopusFeatureConfiguration configures an [OctopusFeatureProvider]. Create
-// one with [NewOctopusFeatureConfiguration], then assign any optional fields
-// before passing it to [NewOctopusFeatureProvider].
-type OctopusFeatureConfiguration struct {
+// FeatureConfiguration configures a [FeatureProvider]. Create one with
+// [NewFeatureConfiguration], then assign any optional fields before passing
+// it to [NewFeatureProvider].
+type FeatureConfiguration struct {
 	// ClientIdentifier is the value of the Octopus variable
 	// Octopus.FeatureFlags.ClientIdentifier.
 	ClientIdentifier string
@@ -41,28 +41,28 @@ type OctopusFeatureConfiguration struct {
 	// nothing.
 	Logger *slog.Logger
 
-	// HttpClient is used for requests to the feature flags service, for
+	// HTTPClient is used for requests to the feature flags service, for
 	// example to configure a proxy, TLS or instrumentation. Nil means the
 	// provider creates and owns its own client. The provider never closes a
 	// client set here.
-	HttpClient *http.Client
+	HTTPClient *http.Client
 
-	serverUri string
+	serverURI string
 }
 
-// NewOctopusFeatureConfiguration returns a configuration with the required
-// values set and every optional field at its default.
-func NewOctopusFeatureConfiguration(clientIdentifier string, productMetadata ProductMetadata) *OctopusFeatureConfiguration {
-	return &OctopusFeatureConfiguration{
+// NewFeatureConfiguration returns a configuration with the required values
+// set and every optional field at its default.
+func NewFeatureConfiguration(clientIdentifier string, productMetadata ProductMetadata) *FeatureConfiguration {
+	return &FeatureConfiguration{
 		ClientIdentifier: clientIdentifier,
 		ProductMetadata:  productMetadata,
 		CacheDuration:    time.Minute,
 		RequestTimeout:   10 * time.Second,
-		serverUri:        defaultServerUri,
+		serverURI:        defaultServerURI,
 	}
 }
 
-func (c *OctopusFeatureConfiguration) validate() error {
+func (c *FeatureConfiguration) validate() error {
 	var errs []error
 
 	if strings.TrimSpace(c.ClientIdentifier) == "" {
