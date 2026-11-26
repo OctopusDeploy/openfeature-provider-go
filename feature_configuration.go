@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-const defaultServerUri = "https://features.octopus.com"
+const defaultServerURI = "https://features.octopus.com"
 
 // FeatureConfiguration configures a [FeatureProvider]. Create one with
 // [NewFeatureConfiguration], then assign any optional fields before passing
@@ -58,7 +58,7 @@ func NewFeatureConfiguration(clientIdentifier string, productMetadata ProductMet
 		ProductMetadata:  productMetadata,
 		CacheDuration:    time.Minute,
 		RequestTimeout:   10 * time.Second,
-		serverURI:        defaultServerUri,
+		serverURI:        defaultServerURI,
 	}
 }
 

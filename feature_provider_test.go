@@ -295,10 +295,10 @@ func TestInjectedHTTPClientIsUsed(t *testing.T) {
 
 type wrappedTransport struct{ http.RoundTripper }
 
-func TestNewDefaultHttpClientClonesAPlainTransport(t *testing.T) {
+func TestNewDefaultHTTPClientClonesAPlainTransport(t *testing.T) {
 	base := &http.Transport{}
 
-	client, owned := newDefaultHttpClient(base)
+	client, owned := newDefaultHTTPClient(base)
 
 	if !owned {
 		t.Error("owned = false, want true")
@@ -308,10 +308,10 @@ func TestNewDefaultHttpClientClonesAPlainTransport(t *testing.T) {
 	}
 }
 
-func TestNewDefaultHttpClientUsesAWrappedTransportAsIs(t *testing.T) {
+func TestNewDefaultHTTPClientUsesAWrappedTransportAsIs(t *testing.T) {
 	base := wrappedTransport{&http.Transport{}}
 
-	client, owned := newDefaultHttpClient(base)
+	client, owned := newDefaultHTTPClient(base)
 
 	if owned {
 		t.Error("owned = true, want false")
@@ -401,8 +401,8 @@ func TestNewFeatureProviderDefaultsServerURIForStructLiteralConfiguration(t *tes
 		t.Fatal(err)
 	}
 
-	if provider.configuration.serverURI != defaultServerUri {
-		t.Errorf("serverURI = %q, want %q", provider.configuration.serverURI, defaultServerUri)
+	if provider.configuration.serverURI != defaultServerURI {
+		t.Errorf("serverURI = %q, want %q", provider.configuration.serverURI, defaultServerURI)
 	}
 }
 
@@ -772,19 +772,19 @@ func TestShutdownLeavesAnInjectedHTTPClientOpen(t *testing.T) {
 	}
 }
 
-func TestShutdownClosesAnOwnedHttpClient(t *testing.T) {
+func TestShutdownClosesAnOwnedHTTPClient(t *testing.T) {
 	server := newFakeFeatureFlagsServer(t)
 	provider, err := NewFeatureProvider(server.configuration(t))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if provider.ownedHttpClient == nil {
-		t.Fatal("ownedHttpClient = nil, want the provider's own client")
+	if provider.ownedHTTPClient == nil {
+		t.Fatal("ownedHTTPClient = nil, want the provider's own client")
 	}
 	// The API client shares this *http.Client, so its requests go through the
 	// tracking transport too.
-	transport := &closeTrackingTransport{RoundTripper: provider.ownedHttpClient.Transport}
-	provider.ownedHttpClient.Transport = transport
+	transport := &closeTrackingTransport{RoundTripper: provider.ownedHTTPClient.Transport}
+	provider.ownedHTTPClient.Transport = transport
 	if err := provider.InitWithContext(context.Background(), openfeature.EvaluationContext{}); err != nil {
 		t.Fatal(err)
 	}

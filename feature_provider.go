@@ -30,7 +30,7 @@ type FeatureProvider struct {
 	// Nil when the provider doesn't own the client's transport: the caller
 	// supplied HTTPClient, or the application has wrapped
 	// http.DefaultTransport.
-	ownedHttpClient *http.Client
+	ownedHTTPClient *http.Client
 }
 
 // NewFeatureProvider returns a provider for the given configuration.
@@ -51,7 +51,7 @@ func NewFeatureProvider(configuration *FeatureConfiguration) (*FeatureProvider, 
 	provider := &FeatureProvider{configuration: *configuration}
 	// A configuration built as a struct literal skips the constructor's default.
 	if provider.configuration.serverURI == "" {
-		provider.configuration.serverURI = defaultServerUri
+		provider.configuration.serverURI = defaultServerURI
 	}
 
 	logger := provider.configuration.Logger
@@ -63,9 +63,9 @@ func NewFeatureProvider(configuration *FeatureConfiguration) (*FeatureProvider, 
 	httpClient := provider.configuration.HTTPClient
 	if httpClient == nil {
 		var owned bool
-		httpClient, owned = newDefaultHttpClient(http.DefaultTransport)
+		httpClient, owned = newDefaultHTTPClient(http.DefaultTransport)
 		if owned {
-			provider.ownedHttpClient = httpClient
+			provider.ownedHTTPClient = httpClient
 		}
 	}
 
@@ -84,12 +84,12 @@ func NewFeatureProvider(configuration *FeatureConfiguration) (*FeatureProvider, 
 	return provider, nil
 }
 
-// newDefaultHttpClient returns the client used when none is configured. A
+// newDefaultHTTPClient returns the client used when none is configured. A
 // plain transport is cloned, so closing its idle connections on shutdown
 // can't affect anything else that shares it. A wrapped one, for example for
 // tracing, is used as-is so requests still go through the wrapper, and isn't
 // owned.
-func newDefaultHttpClient(base http.RoundTripper) (client *http.Client, owned bool) {
+func newDefaultHTTPClient(base http.RoundTripper) (client *http.Client, owned bool) {
 	if transport, ok := base.(*http.Transport); ok {
 		return &http.Client{Transport: transport.Clone()}, true
 	}
@@ -138,8 +138,8 @@ func (p *FeatureProvider) Shutdown() {
 func (p *FeatureProvider) ShutdownWithContext(ctx context.Context) error {
 	err := p.evaluatorCache.Shutdown(ctx)
 
-	if p.ownedHttpClient != nil {
-		p.ownedHttpClient.CloseIdleConnections()
+	if p.ownedHTTPClient != nil {
+		p.ownedHTTPClient.CloseIdleConnections()
 	}
 
 	return err
