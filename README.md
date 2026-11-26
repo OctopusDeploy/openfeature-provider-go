@@ -92,7 +92,7 @@ For information on using the OpenFeature client, refer to the [OpenFeature Go SD
 | `ReleaseVersionOverride` | No | Overrides the release version embedded in the client identifier. Must not contain line breaks or other control characters. |
 | `Logger` | No | A `*slog.Logger` for the provider's own log messages. If it's nil, the provider logs nothing. |
 | `HTTPClient` | No | The `*http.Client` for requests to Octopus. If it's nil, the provider creates its own. |
-| `ServerURI` | No | The base URI of the Octopus feature flags service. Defaults to `https://features.octopus.com`. Must be an absolute `http` or `https` URI. |
+| `ServerURI` | No | The base URI of the Octopus feature flags service, for testing against a non-production service. Leave it unset in production. Defaults to `https://features.octopus.com`. Must be an absolute `http` or `https` URI. |
 
 Provide an `HTTPClient` to add tracing, a proxy or custom TLS. For example, to trace requests with [OpenTelemetry](https://pkg.go.dev/go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp):
 

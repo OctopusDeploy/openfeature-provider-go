@@ -38,9 +38,9 @@ type FeatureProvider struct {
 // ReleaseVersionOverride contains a line break or other control character,
 // ProductMetadata wasn't created with one of its constructors, CacheDuration
 // or RequestTimeout isn't positive, or ServerURI is set but isn't an absolute
-// http or https URI. The provider keeps its own
-// copy, so changes to configuration afterwards have no effect on it. It makes
-// no requests until the SDK initializes it.
+// http or https URI. The provider keeps its own copy, so changes to
+// configuration afterwards have no effect on it. It makes no requests until
+// the SDK initializes it.
 func NewFeatureProvider(configuration *FeatureConfiguration) (*FeatureProvider, error) {
 	if configuration == nil {
 		return nil, errors.New("configuration must not be nil")

@@ -48,8 +48,9 @@ type FeatureConfiguration struct {
 	// client set here.
 	HTTPClient *http.Client
 
-	// ServerURI is the base URI of the feature flags service. It must be an
-	// absolute http or https URI. Defaults to https://features.octopus.com.
+	// ServerURI is the base URI of the feature flags service, for testing
+	// against a non-production service. Leave it unset in production. It must
+	// be an absolute http or https URI. Defaults to https://features.octopus.com.
 	ServerURI string
 }
 
