@@ -14,7 +14,7 @@ func TestNewFeatureConfigurationSetsDefaults(t *testing.T) {
 	if configuration.RequestTimeout != 10*time.Second {
 		t.Errorf("RequestTimeout = %v, want %v", configuration.RequestTimeout, 10*time.Second)
 	}
-	if configuration.serverURI != "https://features.octopus.com" {
-		t.Errorf("serverURI = %q, want %q", configuration.serverURI, "https://features.octopus.com")
+	if configuration.ServerURI != "https://features.octopus.com" {
+		t.Errorf("ServerURI = %q, want %q", configuration.ServerURI, "https://features.octopus.com")
 	}
 }

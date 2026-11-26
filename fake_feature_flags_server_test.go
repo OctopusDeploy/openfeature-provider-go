@@ -61,7 +61,7 @@ func (s *fakeFeatureFlagsServer) configuration(t *testing.T) *FeatureConfigurati
 	t.Helper()
 
 	configuration := newTestConfiguration(t)
-	configuration.serverURI = s.URL
+	configuration.ServerURI = s.URL
 
 	return configuration
 }

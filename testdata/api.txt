@@ -23,5 +23,6 @@ pkg octopus, type FeatureConfiguration struct, Logger *slog.Logger
 pkg octopus, type FeatureConfiguration struct, ProductMetadata ProductMetadata
 pkg octopus, type FeatureConfiguration struct, ReleaseVersionOverride string
 pkg octopus, type FeatureConfiguration struct, RequestTimeout time.Duration
+pkg octopus, type FeatureConfiguration struct, ServerURI string
 pkg octopus, type FeatureProvider struct
 pkg octopus, type ProductMetadata struct
