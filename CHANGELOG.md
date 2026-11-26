@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.0](https://github.com/OctopusDeploy/openfeature-provider-go/compare/v0.1.0...v0.2.0) (2026-11-26)
+
+
+### Features
+
+* allow the server URI to be configured ([#28](https://github.com/OctopusDeploy/openfeature-provider-go/issues/28)) ([25606ac](https://github.com/OctopusDeploy/openfeature-provider-go/commit/25606ac42b4b60aba1d619f8ef4183f26572fae8))
+
 ## 0.1.0 (2026-11-26)
 
 

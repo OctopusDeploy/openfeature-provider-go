@@ -1,3 +1,3 @@
 package octopus
 
-const version = "0.1.0" // x-release-please-version
+const version = "0.2.0" // x-release-please-version
