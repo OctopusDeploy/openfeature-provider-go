@@ -349,6 +349,8 @@ func TestNewOctopusFeatureProviderRejectsInvalidConfiguration(t *testing.T) {
 	}{
 		{"empty client identifier", func(c *OctopusFeatureConfiguration) { c.ClientIdentifier = "" }, []string{"ClientIdentifier"}},
 		{"whitespace client identifier", func(c *OctopusFeatureConfiguration) { c.ClientIdentifier = "  \t" }, []string{"ClientIdentifier"}},
+		{"client identifier with a trailing newline", func(c *OctopusFeatureConfiguration) { c.ClientIdentifier = "client-identifier\n" }, []string{"ClientIdentifier"}},
+		{"release version override with a trailing line break", func(c *OctopusFeatureConfiguration) { c.ReleaseVersionOverride = "1.0\r\n" }, []string{"ReleaseVersionOverride"}},
 		{"zero-value product metadata", func(c *OctopusFeatureConfiguration) { c.ProductMetadata = ProductMetadata{} }, []string{"ProductMetadata"}},
 		{"zero cache duration", func(c *OctopusFeatureConfiguration) { c.CacheDuration = 0 }, []string{"CacheDuration"}},
 		{"negative cache duration", func(c *OctopusFeatureConfiguration) { c.CacheDuration = -time.Second }, []string{"CacheDuration"}},

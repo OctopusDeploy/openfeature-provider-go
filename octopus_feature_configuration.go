@@ -67,6 +67,11 @@ func (c *OctopusFeatureConfiguration) validate() error {
 
 	if strings.TrimSpace(c.ClientIdentifier) == "" {
 		errs = append(errs, errors.New("ClientIdentifier must not be empty"))
+	} else if strings.ContainsFunc(c.ClientIdentifier, isInvalidInHeaderValue) {
+		errs = append(errs, errors.New("ClientIdentifier must not contain line breaks or other control characters"))
+	}
+	if strings.ContainsFunc(c.ReleaseVersionOverride, isInvalidInHeaderValue) {
+		errs = append(errs, fmt.Errorf("ReleaseVersionOverride must not contain line breaks or other control characters, got %q", c.ReleaseVersionOverride))
 	}
 	// The constructors guarantee a name, so an empty one means a zero value.
 	if c.ProductMetadata.Name() == "" {
@@ -80,4 +85,8 @@ func (c *OctopusFeatureConfiguration) validate() error {
 	}
 
 	return errors.Join(errs...)
+}
+
+func isInvalidInHeaderValue(r rune) bool {
+	return (r < 0x20 && r != '\t') || r == 0x7f
 }
