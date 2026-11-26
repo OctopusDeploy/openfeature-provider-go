@@ -14,9 +14,35 @@ jobs:
   validate-pr-title:
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       pull-requests: read
 
     steps:
       - uses: amannn/action-semantic-pull-request@2252a14e810aa9b85c2d560bd7070c802206ecf6 # v6
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # Release Please only bumps the major version for a breaking-change marker, so an unmarked break would reach
+      # consumers as a minor or patch release. From v1, fixing that properly takes a new /vN module path.
+      - uses: actions/checkout@v7
+        with:
+          # The PR's merge commit and its first parent, the base it merges into. Comparing with the base rather than
+          # the last release only flags this PR's own breaks.
+          fetch-depth: 2
+
+      - uses: actions/setup-go@v7
+        with:
+          # Same as the latest test entry in main.yml; Renovate bumps them together
+          go-version: "1.27"
+
+      # Pinned in its own module so it stays out of the provider's go.mod
+      - name: Install apidiff
+        working-directory: .github/tools
+        run: |
+          go build -o "$RUNNER_TEMP/bin/apidiff" golang.org/x/exp/cmd/apidiff
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+
+      - name: Check incompatible API changes are marked as breaking
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: .github/scripts/check-api-compatibility.sh HEAD^1 "$PR_TITLE"
