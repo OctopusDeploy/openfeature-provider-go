@@ -356,6 +356,8 @@ func TestNewFeatureProviderRejectsInvalidConfiguration(t *testing.T) {
 		{"negative cache duration", func(c *FeatureConfiguration) { c.CacheDuration = -time.Second }, []string{"CacheDuration"}},
 		{"zero request timeout", func(c *FeatureConfiguration) { c.RequestTimeout = 0 }, []string{"RequestTimeout"}},
 		{"negative request timeout", func(c *FeatureConfiguration) { c.RequestTimeout = -time.Second }, []string{"RequestTimeout"}},
+		{"relative server URI", func(c *FeatureConfiguration) { c.ServerURI = "features.example.com" }, []string{"ServerURI"}},
+		{"non-http server URI", func(c *FeatureConfiguration) { c.ServerURI = "ftp://features.example.com" }, []string{"ServerURI"}},
 		{
 			"every problem at once",
 			func(c *FeatureConfiguration) { *c = FeatureConfiguration{} },
@@ -401,8 +403,8 @@ func TestNewFeatureProviderDefaultsServerURIForStructLiteralConfiguration(t *tes
 		t.Fatal(err)
 	}
 
-	if provider.configuration.serverURI != defaultServerURI {
-		t.Errorf("serverURI = %q, want %q", provider.configuration.serverURI, defaultServerURI)
+	if provider.configuration.ServerURI != defaultServerURI {
+		t.Errorf("ServerURI = %q, want %q", provider.configuration.ServerURI, defaultServerURI)
 	}
 }
 

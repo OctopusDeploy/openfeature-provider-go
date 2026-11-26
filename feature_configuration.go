@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -47,7 +48,10 @@ type FeatureConfiguration struct {
 	// client set here.
 	HTTPClient *http.Client
 
-	serverURI string
+	// ServerURI is the base URI of the feature flags service, for testing
+	// against a non-production service. Leave it unset in production. It must
+	// be an absolute http or https URI. Defaults to https://features.octopus.com.
+	ServerURI string
 }
 
 // NewFeatureConfiguration returns a configuration with the required values
@@ -58,7 +62,7 @@ func NewFeatureConfiguration(clientIdentifier string, productMetadata ProductMet
 		ProductMetadata:  productMetadata,
 		CacheDuration:    time.Minute,
 		RequestTimeout:   10 * time.Second,
-		serverURI:        defaultServerURI,
+		ServerURI:        defaultServerURI,
 	}
 }
 
@@ -82,6 +86,11 @@ func (c *FeatureConfiguration) validate() error {
 	}
 	if c.RequestTimeout <= 0 {
 		errs = append(errs, fmt.Errorf("RequestTimeout must be positive, got %v", c.RequestTimeout))
+	}
+	if c.ServerURI != "" {
+		if serverURL, err := url.Parse(c.ServerURI); err != nil || (serverURL.Scheme != "http" && serverURL.Scheme != "https") || serverURL.Host == "" {
+			errs = append(errs, fmt.Errorf("ServerURI must be an absolute http or https URI, got %q", c.ServerURI))
+		}
 	}
 
 	return errors.Join(errs...)

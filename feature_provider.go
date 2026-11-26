@@ -36,10 +36,11 @@ type FeatureProvider struct {
 // NewFeatureProvider returns a provider for the given configuration.
 // It returns an error if ClientIdentifier is empty, ClientIdentifier or
 // ReleaseVersionOverride contains a line break or other control character,
-// ProductMetadata wasn't created with one of its constructors, or
-// CacheDuration or RequestTimeout isn't positive. The provider keeps its own
-// copy, so changes to configuration afterwards have no effect on it. It makes
-// no requests until the SDK initializes it.
+// ProductMetadata wasn't created with one of its constructors, CacheDuration
+// or RequestTimeout isn't positive, or ServerURI is set but isn't an absolute
+// http or https URI. The provider keeps its own copy, so changes to
+// configuration afterwards have no effect on it. It makes no requests until
+// the SDK initializes it.
 func NewFeatureProvider(configuration *FeatureConfiguration) (*FeatureProvider, error) {
 	if configuration == nil {
 		return nil, errors.New("configuration must not be nil")
@@ -50,8 +51,8 @@ func NewFeatureProvider(configuration *FeatureConfiguration) (*FeatureProvider, 
 
 	provider := &FeatureProvider{configuration: *configuration}
 	// A configuration built as a struct literal skips the constructor's default.
-	if provider.configuration.serverURI == "" {
-		provider.configuration.serverURI = defaultServerURI
+	if provider.configuration.ServerURI == "" {
+		provider.configuration.ServerURI = defaultServerURI
 	}
 
 	logger := provider.configuration.Logger
@@ -70,7 +71,7 @@ func NewFeatureProvider(configuration *FeatureConfiguration) (*FeatureProvider, 
 	}
 
 	apiClient := featureflags.NewFeatureFlagApiClient(featureflags.FeatureFlagApiClientOptions{
-		ServerUri:              provider.configuration.serverURI,
+		ServerUri:              provider.configuration.ServerURI,
 		ClientIdentifier:       provider.configuration.ClientIdentifier,
 		ProductName:            provider.configuration.ProductMetadata.Name(),
 		ProductVersion:         provider.configuration.ProductMetadata.Version(),
